@@ -1,5 +1,6 @@
-"""Unit tests for complaint narrative preparation and profiling."""
+"""Unit tests for complaint narrative preparation, profiling, and validation."""
 
+from pathlib import Path
 import pandas as pd
 import pytest
 
@@ -9,6 +10,9 @@ from src.nlp.prepare_text import (
     compute_repeated_narrative_stats,
     count_words,
     detect_redaction,
+    export_text_dataset,
+    format_text_profile_report,
+    load_text_dataset,
     normalize_text,
     prepare_text_dataset,
     validate_text_dataset,
@@ -21,13 +25,34 @@ def test_normalize_text_lowercase_and_whitespace() -> None:
     assert normalized == "this is a test with newlines and tabs."
 
 
-def test_normalize_text_masking_placeholder_removal() -> None:
-    raw = "Contacted XXXX Bank regarding account XXXXXXXX on XXXX."
-    normalized = normalize_text(raw)
-    assert normalized == "contacted bank regarding account on ."
-    # Verify non-redacted words containing 'x' are preserved
-    assert "tax" in normalize_text("paid my tax")
-    assert "fox" in normalize_text("the quick brown fox")
+def test_redaction_removal_from_standalone_placeholders() -> None:
+    assert normalize_text("XXXX") == ""
+    assert normalize_text("XXXXXXXX") == ""
+    assert normalize_text("Contacted XXXX Bank regarding account XXXXXXXX.") == "contacted bank regarding account ."
+    assert normalize_text("Date: XXXX/XX/XX on file.") == "date: /xx/xx on file."
+    assert normalize_text("Balance of $XXXX.00 overdue.") == "balance of $.00 overdue."
+
+
+def test_preservation_of_words_containing_internal_xxxx() -> None:
+    assert normalize_text("This is an exxxxample of text.") == "this is an exxxxample of text."
+    assert normalize_text("wordXXXX") == "wordxxxx"
+    assert normalize_text("XXXXword") == "xxxxword"
+    assert normalize_text("paid my tax") == "paid my tax"
+    assert normalize_text("the quick brown fox") == "the quick brown fox"
+
+
+def test_correct_redaction_detection_using_revised_pattern() -> None:
+    assert detect_redaction("My account XXXX was closed.") is True
+    assert detect_redaction("XXXXXX reported error.") is True
+    assert detect_redaction("XXXX1234") is True
+    assert detect_redaction("1234XXXX") is True
+    assert detect_redaction("exxxxample") is False
+    assert detect_redaction("wordXXXX") is False
+    assert detect_redaction("XXXXword") is False
+    assert detect_redaction("tax") is False
+    assert detect_redaction("No placeholders in this statement.") is False
+    assert detect_redaction("") is False
+    assert detect_redaction(None) is False
 
 
 def test_normalize_text_preserves_negations_and_financial_terms() -> None:
@@ -76,15 +101,6 @@ def test_count_words_and_character_counts() -> None:
     assert len(empty) == 0
 
 
-def test_detect_redaction() -> None:
-    assert detect_redaction("My account XXXX was closed.") is True
-    assert detect_redaction("XXXXXX reported error.") is True
-    assert detect_redaction("No placeholders in this statement.") is False
-    assert detect_redaction("") is False
-    assert detect_redaction(None) is False
-    assert detect_redaction("The fix was approved.") is False
-
-
 def test_prepare_text_dataset_preserves_identifiers() -> None:
     df_clean = pd.DataFrame(
         {
@@ -105,27 +121,7 @@ def test_prepare_text_dataset_preserves_identifiers() -> None:
     assert df_text.loc[0, "text_nlp"] == "paid on time."
 
 
-def test_repeated_narrative_stats() -> None:
-    df_text = pd.DataFrame(
-        {
-            "complaint_id": list(range(1, 8)),
-            "narrative_group_id": ["g1", "g1", "g1", "g2", "g2", "g3", "g4"],
-            "text_nlp": ["text"] * 7,
-            "character_count": [4] * 7,
-            "word_count": [1] * 7,
-            "has_redaction": [False] * 7,
-        }
-    )
-    stats = compute_repeated_narrative_stats(df_text)
-
-    assert stats["distinct_groups"] == 4
-    assert stats["repeated_groups"] == 2  # g1 (size 3) and g2 (size 2)
-    assert stats["records_in_repeated_groups"] == 5
-    assert stats["repeated_records_percentage"] == round(100.0 * 5 / 7, 2)
-    assert stats["largest_group_size"] == 3
-
-
-def test_prepare_text_dataset_row_count() -> None:
+def test_prepare_text_dataset_row_count_and_empty_text() -> None:
     df_clean = pd.DataFrame(
         {
             "complaint_id": [1, 2, 3, 4],
@@ -144,6 +140,135 @@ def test_prepare_text_dataset_row_count() -> None:
     assert df_text.loc[1, "character_count"] == 0
     assert df_text.loc[1, "word_count"] == 0
     assert bool(df_text.loc[1, "has_redaction"]) is True
+
+
+def test_empty_strings_survive_export_and_reload(tmp_path: Path) -> None:
+    export_file = tmp_path / "test_complaints_text.csv.gz"
+    df = pd.DataFrame(
+        {
+            "complaint_id": [1, 2, 3],
+            "narrative_group_id": ["grp_1", "grp_2", "grp_3"],
+            "text_nlp": ["valid narrative text", "", "another complaint narrative"],
+            "character_count": [20, 0, 27],
+            "word_count": [3, 0, 3],
+            "has_redaction": [False, True, False],
+        }
+    )
+
+    export_text_dataset(df, export_file)
+    reloaded = load_text_dataset(export_file)
+
+    assert len(reloaded) == 3
+    assert reloaded.loc[1, "text_nlp"] == ""
+    assert isinstance(reloaded.loc[1, "text_nlp"], str)
+    assert not pd.isna(reloaded.loc[1, "text_nlp"])
+    assert not reloaded["text_nlp"].isna().any()
+
+
+def test_distinguish_empty_string_from_missing_value(tmp_path: Path) -> None:
+    export_file = tmp_path / "test_na_distinction.csv.gz"
+    df = pd.DataFrame(
+        {
+            "complaint_id": [10],
+            "narrative_group_id": ["grp_10"],
+            "text_nlp": [""],
+            "character_count": [0],
+            "word_count": [0],
+            "has_redaction": [True],
+        }
+    )
+    export_text_dataset(df, export_file)
+    reloaded = load_text_dataset(export_file)
+
+    val = reloaded.loc[0, "text_nlp"]
+    assert val == ""
+    assert val is not None
+    assert not pd.isna(val)
+    assert len(val) == 0
+
+
+def test_exact_preservation_of_saved_text_and_identifiers(tmp_path: Path) -> None:
+    export_file = tmp_path / "test_preservation.csv.gz"
+    df = pd.DataFrame(
+        {
+            "complaint_id": [501, 502],
+            "narrative_group_id": ["sha256_hash_1", "sha256_hash_2"],
+            "text_nlp": ["first dispute detail", "second dispute detail"],
+            "character_count": [20, 21],
+            "word_count": [3, 3],
+            "has_redaction": [False, True],
+        }
+    )
+    export_text_dataset(df, export_file)
+    reloaded = load_text_dataset(export_file)
+
+    assert reloaded["complaint_id"].tolist() == [501, 502]
+    assert reloaded["narrative_group_id"].tolist() == ["sha256_hash_1", "sha256_hash_2"]
+    assert reloaded["text_nlp"].tolist() == ["first dispute detail", "second dispute detail"]
+    assert reloaded["character_count"].tolist() == [20, 21]
+    assert reloaded["word_count"].tolist() == [3, 3]
+    assert reloaded["has_redaction"].tolist() == [False, True]
+
+
+def test_validation_failure_when_processed_text_modified_incorrectly() -> None:
+    df_clean = pd.DataFrame(
+        {
+            "complaint_id": [1, 2],
+            "narrative_group_id": ["h1", "h2"],
+            "consumer_complaint_narrative": ["text one", "text two"],
+        }
+    )
+    df_text = prepare_text_dataset(df_clean)
+
+    # 1. Modify text to uppercase
+    bad_upper = df_text.copy()
+    bad_upper.loc[0, "text_nlp"] = "TEXT ONE"
+    with pytest.raises(ValueError, match="uppercase"):
+        validate_text_dataset(df_clean, bad_upper)
+
+    # 2. Modify text to have extra whitespace (updating character_count so length check passes)
+    bad_spaces = df_text.copy()
+    bad_spaces.loc[0, "text_nlp"] = "  text one  "
+    bad_spaces.loc[0, "character_count"] = len("  text one  ")
+    with pytest.raises(ValueError, match="whitespace"):
+        validate_text_dataset(df_clean, bad_spaces)
+
+    # 3. Modify text to a different arbitrary string (with matching character and word counts)
+    bad_content = df_text.copy()
+    bad_content.loc[0, "text_nlp"] = "corrupted text"
+    bad_content.loc[0, "character_count"] = len("corrupted text")
+    bad_content.loc[0, "word_count"] = 2
+    with pytest.raises(ValueError, match="normalize_text"):
+        validate_text_dataset(df_clean, bad_content)
+
+
+def test_validation_failure_when_counts_or_redaction_incorrect() -> None:
+    df_clean = pd.DataFrame(
+        {
+            "complaint_id": [1],
+            "narrative_group_id": ["h1"],
+            "consumer_complaint_narrative": ["statement error XXXX."],
+        }
+    )
+    df_text = prepare_text_dataset(df_clean)
+
+    # Bad character count
+    bad_chars = df_text.copy()
+    bad_chars.loc[0, "character_count"] = 999
+    with pytest.raises(ValueError, match="character_count does not match"):
+        validate_text_dataset(df_clean, bad_chars)
+
+    # Bad word count
+    bad_words = df_text.copy()
+    bad_words.loc[0, "word_count"] = 999
+    with pytest.raises(ValueError, match="word_count does not match"):
+        validate_text_dataset(df_clean, bad_words)
+
+    # Bad redaction indicator
+    bad_redaction = df_text.copy()
+    bad_redaction.loc[0, "has_redaction"] = False
+    with pytest.raises(ValueError, match="has_redaction does not match"):
+        validate_text_dataset(df_clean, bad_redaction)
 
 
 def test_validate_text_dataset_raises_on_invalid_columns_or_mismatch() -> None:
@@ -171,3 +296,116 @@ def test_validate_text_dataset_raises_on_invalid_columns_or_mismatch() -> None:
     df_bad_id.loc[0, "complaint_id"] = 999
     with pytest.raises(ValueError, match="complaint_id column does not match"):
         validate_text_dataset(df_clean, df_bad_id)
+
+    # Duplicate complaint_id
+    df_dupe = df_text.copy()
+    df_dupe.loc[1, "complaint_id"] = df_dupe.loc[0, "complaint_id"]
+    with pytest.raises(ValueError, match="duplicate values"):
+        validate_text_dataset(df_clean, df_dupe)
+
+
+def test_repeated_narrative_stats() -> None:
+    df_text = pd.DataFrame(
+        {
+            "complaint_id": list(range(1, 8)),
+            "narrative_group_id": ["g1", "g1", "g1", "g2", "g2", "g3", "g4"],
+            "text_nlp": ["text"] * 7,
+            "character_count": [4] * 7,
+            "word_count": [1] * 7,
+            "has_redaction": [False] * 7,
+        }
+    )
+    stats = compute_repeated_narrative_stats(df_text)
+
+    assert stats["distinct_groups"] == 4
+    assert stats["repeated_groups"] == 2
+    assert stats["records_in_repeated_groups"] == 5
+    assert stats["repeated_records_percentage"] == round(100.0 * 5 / 7, 2)
+    assert stats["largest_group_size"] == 3
+
+
+def test_dynamic_report_values_change_with_synthetic_statistics() -> None:
+    stats_a = {
+        "total_complaints": 1000,
+        "nonempty_narratives": 990,
+        "empty_narratives": 10,
+        "median_char_count": 250.0,
+        "median_word_count": 50.0,
+        "p10_word_count": 10.0,
+        "p90_word_count": 100.0,
+        "redacted_count": 600,
+        "redacted_percentage": 60.0,
+        "short_text_count": 150,
+        "short_text_percentage": 15.0,
+    }
+    rep_a = {
+        "distinct_groups": 800,
+        "repeated_groups": 50,
+        "records_in_repeated_groups": 100,
+        "repeated_records_percentage": 10.0,
+        "largest_group_size": 25,
+    }
+    prod_a = pd.DataFrame(
+        {
+            "product": ["Product X", "Product Y"],
+            "complaint_count": [600, 400],
+            "median_word_count": [40.0, 70.0],
+            "redaction_percentage": [55.0, 65.0],
+            "repeated_group_percentage": [8.0, 12.0],
+        }
+    )
+
+    report_a = format_text_profile_report(stats_a, rep_a, prod_a)
+
+    assert "50 words" in report_a
+    assert "10 words" in report_a
+    assert "100 words" in report_a
+    assert "15.00%" in report_a
+    assert "10.00%" in report_a
+    assert "93.75%" in report_a
+    assert "60.00%" in report_a
+
+    stats_b = {
+        "total_complaints": 5000,
+        "nonempty_narratives": 4995,
+        "empty_narratives": 5,
+        "median_char_count": 600.0,
+        "median_word_count": 125.0,
+        "p10_word_count": 35.0,
+        "p90_word_count": 410.0,
+        "redacted_count": 3500,
+        "redacted_percentage": 70.0,
+        "short_text_count": 200,
+        "short_text_percentage": 4.0,
+    }
+    rep_b = {
+        "distinct_groups": 4000,
+        "repeated_groups": 400,
+        "records_in_repeated_groups": 1200,
+        "repeated_records_percentage": 24.0,
+        "largest_group_size": 150,
+    }
+    prod_b = pd.DataFrame(
+        {
+            "product": ["Product A", "Product B"],
+            "complaint_count": [3000, 2000],
+            "median_word_count": [90.0, 180.0],
+            "redaction_percentage": [68.0, 75.0],
+            "repeated_group_percentage": [5.0, 20.0],
+        }
+    )
+
+    report_b = format_text_profile_report(stats_b, rep_b, prod_b)
+
+    assert "125 words" in report_b
+    assert "35 words" in report_b
+    assert "410 words" in report_b
+    assert "4.00%" in report_b
+    assert "24.00%" in report_b
+    assert "90.00%" in report_b
+    assert "70.00%" in report_b
+
+    assert "While 88.9%" not in report_a
+    assert "While 88.9%" not in report_b
+    assert "credit-repair template" not in report_a
+    assert "credit-repair template" not in report_b
