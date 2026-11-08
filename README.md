@@ -4,7 +4,7 @@
 
 SUNWAI analyzes historical US Consumer Financial Protection Bureau (CFPB) complaints to understand recurring customer issues and evaluate company responses. By combining structured complaint fields with written customer narratives, the project explores patterns in complaints and examines whether narrative text provides useful insights beyond standard category codes.
 
-The project has completed initial dataset profiling, data preparation, and relational database creation. The cleaned dataset is loaded into a local SQLite database (`data/processed/sunwai.sqlite3`) with dedicated dimension tables for products, companies, and states. Business analytics queries, NLP models, and dashboards have not yet been built.
+The project has completed initial dataset profiling, data preparation, relational database creation, and SQL business analysis. Using an indexed SQLite database (`data/processed/sunwai.sqlite3`), the project analyzes full-calendar-year 2019 complaint volumes, product distributions, reported relief rates, and product-aware peer company benchmarks. NLP models, machine-learning classifiers, and dashboards have not yet been built.
 
 ## Dataset
 
@@ -79,28 +79,33 @@ The planned project workflow includes:
    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz" -OutFile "data/raw/complaints.csv.gz"
    ```
 
-5. Run dataset profiling, data preparation, database creation, and tests:
+5. Run dataset profiling, data preparation, database creation, SQL analysis, and tests:
 
    ```bash
    python src/data/profile_complaints.py
    python -m src.data.prepare_complaints
    python -m src.data.build_database
+   python -m src.analytics.run_sql_analyses
    python -m pytest -q
    ```
 
 ## Project Files
 
 - `sql/schema.sql`: Relational database schema and index definitions for SQLite.
+- `sql/analysis/`: Analytical SQL queries examining monthly volume, product relief, company volume, issues, product-mix benchmarks, and timeliness.
 - `src/data/profile_complaints.py`: Script that inspects the raw dataset and calculates summary statistics.
 - `src/data/prepare_complaints.py`: Script that cleans data fields, maps reported relief outcomes, groups narratives, and exports the processed dataset.
 - `src/data/build_database.py`: Script that initializes the SQLite database, populates dimension and fact tables, and validates data integrity.
+- `src/analytics/run_sql_analyses.py`: Script that executes the SQL analytical queries, exports CSV summaries to `outputs/sql/`, and generates the findings report.
 - `docs/data_dictionary.md`: [Data Dictionary](docs/data_dictionary.md) explaining all original and prepared dataset columns.
 - `docs/database_schema.md`: [Database Schema](docs/database_schema.md) describing table structures, relationships, and constraints.
 - `reports/data_profile.md`: [Data Profile Report](reports/data_profile.md) detailing dataset quality and distributions.
 - `reports/data_preparation.md`: [Data Preparation Report](reports/data_preparation.md) detailing data cleaning changes, relief label distributions, and validation checks.
+- `reports/sql_findings.md`: [SQL Business Analysis Findings](reports/sql_findings.md) detailing monthly trends, product-level relief rates, and product-mix-adjusted company comparisons.
 - `tests/test_profile_complaints.py`: Unit tests for profiling and verification functions.
 - `tests/test_prepare_complaints.py`: Unit tests for data cleaning, relief mapping, and narrative grouping.
 - `tests/test_build_database.py`: Unit tests for database table creation, foreign key checks, and rebuilding mechanics.
+- `tests/test_sql_analyses.py`: Unit tests for SQL analytical queries, MoM calculations, and product-mix benchmarks.
 - `config/settings.yaml`: Project paths and configuration settings.
 - `requirements.txt`: Initial Python dependencies.
 

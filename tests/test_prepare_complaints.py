@@ -13,6 +13,8 @@ from src.data.prepare_complaints import (
     derive_reported_relief,
     drop_empty_columns,
     prepare_complaints_data,
+    validate_processed_data,
+    verify_saved_dataset,
 )
 
 
@@ -187,4 +189,58 @@ def test_prepare_complaints_data_pipeline_preserves_rows() -> None:
     # Rows 0 and 2 have identical narrative text -> identical group ID
     assert cleaned["narrative_group_id"].iloc[0] == cleaned["narrative_group_id"].iloc[2]
     assert cleaned["narrative_group_id"].iloc[0] != cleaned["narrative_group_id"].iloc[1]
+
+
+def test_validate_processed_data_against_raw() -> None:
+    raw_df = pd.DataFrame(
+        {
+            "complaint_id": [1, 2],
+            "date_received": ["2019-01-01", "2019-01-02"],
+            "date_sent_to_company": ["2019-01-01", "2019-01-02"],
+            "product": ["Mortgage", "Credit card"],
+            "sub_product": ["Fixed", "General"],
+            "issue": ["Issue 1", "Issue 2"],
+            "sub_issue": [None, None],
+            "consumer_complaint_narrative": ["Narrative A", "Narrative B"],
+            "company_public_response": [None, None],
+            "company": ["Company A", "Company B"],
+            "state": ["CA", "NY"],
+            "zip_code": ["900XX", "100XX"],
+            "tags": [None, None],
+            "consumer_consent_provided": ["Consent provided"] * 2,
+            "submitted_via": ["Web"] * 2,
+            "company_response_to_consumer": ["Closed with explanation", "Closed with monetary relief"],
+            "timely_response": ["Yes", "Yes"],
+            "consumer_disputed": [None, None],
+        }
+    )
+    cleaned_df = prepare_complaints_data(raw_df)
+    summary = validate_processed_data(cleaned_df, raw_df)
+    assert summary["total_records"] == 2
+    assert summary["relief_ones"] == 1
+    assert summary["relief_zeros"] == 1
+    assert summary["relief_na"] == 0
+
+    # Test error when row counts mismatch
+    with pytest.raises(ValueError, match="Row count mismatch"):
+        validate_processed_data(cleaned_df.iloc[:1], raw_df)
+
+
+def test_verify_saved_dataset(tmp_path: pytest.TempPathFactory) -> None:
+    df = pd.DataFrame(
+        {
+            "complaint_id": [1, 2],
+            "zip_code": ["012XX", "902XX"],
+            "reported_relief": pd.Series([1, pd.NA], dtype="Int64"),
+            "narrative_group_id": ["hash_1", "hash_2"],
+        }
+    )
+    test_file = tmp_path / "test_clean.csv.gz"
+    df.to_csv(test_file, index=False, compression="gzip")
+    # Should pass without error
+    verify_saved_dataset(test_file, df)
+
+    # Test failure on corrupted row count
+    with pytest.raises(ValueError, match="Reload verification failed"):
+        verify_saved_dataset(test_file, df.iloc[:1])
 

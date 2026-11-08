@@ -29,18 +29,14 @@
 | Categorical / Text | Trimmed whitespace | Preserved original values, casings, and missing indicators |
 | Dates | Standardized format | Parsed YYYY-MM-DD; 0 missing, 0 invalid |
 
-## 3. Validation Summary
+## 3. Data Integrity and Verification
 
-| Validation Check | Expected | Actual | Status |
-| :--- | :---: | :---: | :---: |
-| Row count preservation | 117,214 | 117,214 | Passed |
-| Unique `complaint_id` | 117,214 | 117,214 | Passed |
-| Missing `complaint_id` | 0 | 0 | Passed |
-| Cleaned columns count | 19 | 19 | Passed |
-| Labeled relief (`1`) | 21,555 | 21,555 | Passed |
-| Labeled no-relief (`0`) | 94,941 | 94,941 | Passed |
-| Unlabeled outcome (`<NA>`) | 718 | 718 | Passed |
-| Distinct narrative groups | 104,196 | 104,196 | Passed |
+- **Record preservation:** All 117,214 input complaint records were verified and preserved in the cleaned dataset without dropping rows.
+- **Identifier consistency:** All complaint IDs were validated against the source dataset for complete uniqueness and absence of null values.
+- **Category consistency:** Full distributions of financial products and company responses were confirmed to match the original raw dataset exactly.
+- **Outcome mapping:** Derived outcomes were independently verified against source response categories (21,555 relief, 94,941 explanation, 718 untimely).
+- **Narrative preservation:** Customer narrative text was preserved with original casing and redactions intact, while generating 104,196 distinct narrative group hashes to support group-aware modeling splits.
+- **Reload verification:** The exported compressed CSV was reloaded from disk and re-verified for schema integrity, row count, outcome labels, and text fields.
 
 ## 4. Important Notes
 
