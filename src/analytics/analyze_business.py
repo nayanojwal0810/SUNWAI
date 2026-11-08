@@ -526,237 +526,12 @@ def generate_figures(
     return saved_files
 
 
-def format_business_findings_report(results: dict[str, Any]) -> str:
-    """Format business analysis and statistical findings into a Markdown report."""
-    ci_df = results["product_relief_ci"]
-    chi2 = results["chi_square"]
-    period_df = results["product_period_sensitivity"]
-    audit = results["benchmark_audit"]
-
-    total_eligible = int(ci_df["eligible_complaints"].sum()) if not ci_df.empty else 0
-    total_relief = int(ci_df["relief_complaints"].sum()) if not ci_df.empty else 0
-    overall_rate = round(100.0 * total_relief / total_eligible, 2) if total_eligible > 0 else 0.0
-
-    valid_ci = ci_df.dropna(subset=["ci_width", "relief_percentage"])
-    if not valid_ci.empty:
-        min_width_row = valid_ci.loc[valid_ci["ci_width"].idxmin()]
-        max_width_row = valid_ci.loc[valid_ci["ci_width"].idxmax()]
-        min_width = float(min_width_row["ci_width"])
-        min_width_prod = str(min_width_row["product_name"])
-        max_width = float(max_width_row["ci_width"])
-        max_width_prod = str(max_width_row["product_name"])
-
-        min_rate_row = valid_ci.loc[valid_ci["relief_percentage"].idxmin()]
-        max_rate_row = valid_ci.loc[valid_ci["relief_percentage"].idxmax()]
-        min_rate = float(min_rate_row["relief_percentage"])
-        min_rate_prod = str(min_rate_row["product_name"])
-        max_rate = float(max_rate_row["relief_percentage"])
-        max_rate_prod = str(max_rate_row["product_name"])
-
-        min_n = int(valid_ci["eligible_complaints"].min())
-        max_n = int(valid_ci["eligible_complaints"].max())
-    else:
-        min_width, max_width = 0.0, 0.0
-        min_width_prod, max_width_prod = "N/A", "N/A"
-        min_rate, max_rate = 0.0, 0.0
-        min_rate_prod, max_rate_prod = "N/A", "N/A"
-        min_n, max_n = 0, 0
-
-    if not period_df.empty:
-        max_diff_row = period_df.iloc[0]
-        max_diff_prod = str(max_diff_row["product_name"])
-        max_diff_val = float(max_diff_row["diff_percentage_points"])
-        max_diff_abs = float(max_diff_row["abs_diff_pp"])
-    else:
-        max_diff_row = None
-        max_diff_prod = "N/A"
-        max_diff_val = 0.0
-        max_diff_abs = 0.0
-
-    sql_count = int(audit.get("sql_count", 0))
-    py_strict_count = int(audit.get("py_strict_count", 0))
-    retention_pct = round(100.0 * py_strict_count / sql_count, 1) if sql_count > 0 else 0.0
-    max_rate_disc = float(audit.get("max_rate_discrepancy", audit.get("max_diff_py_vs_sql", 0.0)))
-
-    valid_shifts = [
-        abs(float(r["shift_pp"]))
-        for r in audit.get("top3_comparison", [])
-        if r.get("shift_pp") is not None
-    ]
-    max_comp_shift = max(valid_shifts) if valid_shifts else None
-
-    lines = [
-        "# Business Analysis Findings",
-        "",
-        "## Business Analysis Overview",
-        "",
-        "This business analysis examines historical CFPB consumer complaints received during calendar year 2019 "
-        "(January 1, 2019 through December 31, 2019). The analysis evaluates whether observed differences in reported "
-        "relief rates across financial products and institutions reflect meaningful operational patterns, examines sampling "
-        "uncertainty through confidence intervals, and tests the stability of findings across alternative observation windows.",
-        "",
-        f"- **Qualifying 2019 eligible complaints:** {total_eligible:,} records (excluding untimely responses without definitive outcome labels).",
-        f"- **Overall reported-relief count:** {total_relief:,} complaints ({overall_rate:.2f}% baseline relief rate).",
-        "- **Outcome definition:** Reported relief indicates monetary or non-monetary relief reported by the company to the CFPB; "
-        "it does not measure customer satisfaction or complaint merit.",
-        "",
-        "## Product Differences",
-        "",
-        "Reported-relief rates vary significantly by product category. High-volume lending and collection products report "
-        "consistently lower relief frequencies than transaction and depository accounts. Because product sample sizes range from "
-        f"{min_n:,} to {max_n:,} complaints, 95% Wilson score confidence intervals are calculated to assess precision.",
-        "",
-        "| Product | Eligible Complaints | Reported Relief | Relief Rate | 95% Wilson CI | CI Width |",
-        "| :--- | :---: | :---: | :---: | :---: | :---: |",
-    ]
-
-    for _, row in ci_df.iterrows():
-        ci_str = f"[{row['ci_lower']:.2f}%, {row['ci_upper']:.2f}%]" if pd.notna(row["ci_lower"]) else "[—, —]"
-        width_str = f"{row['ci_width']:.2f} pp" if pd.notna(row["ci_width"]) else "—"
-        lines.append(
-            f"| {row['product_name']} | {int(row['eligible_complaints']):,} | {int(row['relief_complaints']):,} | "
-            f"{row['relief_percentage']:.2f}% | {ci_str} | {width_str} |"
-        )
-
-    lines.extend(
-        [
-            "",
-            f"Estimated 95% Wilson confidence interval widths range from {min_width:.2f} percentage points ({min_width_prod}) "
-            f"to {max_width:.2f} percentage points ({max_width_prod}). These intervals describe binomial sampling uncertainty "
-            "under simplifying assumptions. Factors such as repeated narratives and selection into the published-narrative dataset "
-            "may reduce the reliability of population-level uncertainty claims.",
-            "",
-            "## Statistical Evidence",
-            "",
-            "A chi-square test of independence was conducted on the contingency table of financial products versus "
-            "complaint resolution outcomes (reported relief versus closed with explanation):",
-            "",
-            f"- **Chi-square statistic (χ²):** {chi2['chi2_stat']:,}",
-            f"- **Degrees of freedom:** {chi2['dof']}",
-            f"- **P-value:** {chi2['p_value_formatted']}",
-            f"- **Total observations analyzed:** {chi2['total_observations']:,}",
-            f"- **Cramér's V effect size:** {chi2['cramers_v']:.4f}",
-            "",
-            "### Interpretation",
-            "",
-            f"Under the test assumptions, the small p-value ({chi2['p_value_formatted']}) indicates an association where "
-            "reported relief is not distributed uniformly across product categories. The chi-square test identifies an association "
-            f"under these assumptions, not causation. The Cramér's V of {chi2['cramers_v']:.4f} describes the strength of this "
-            "observational association without proving practical business significance. Within this extract, observed product relief "
-            f"rates range from {min_rate:.2f}% for {min_rate_prod} to {max_rate:.2f}% for {max_rate_prod}.",
-            "",
-            "### Reporting-Period Sensitivity",
-            "",
-            "To evaluate whether the observed decline in complaint volume during late 2019 affects product-level findings, "
-            "product relief rates for the full calendar year 2019 were compared against January through October 2019:",
-            "",
-            "| Product | Full Year 2019 Eligible | Full Year Relief % | Jan–Oct 2019 Eligible | Jan–Oct Relief % | Difference (pp) |",
-            "| :--- | :---: | :---: | :---: | :---: | :---: |",
-        ]
-    )
-
-    for _, row in period_df.iterrows():
-        diff_str = f"{row['diff_percentage_points']:+.2f}"
-        lines.append(
-            f"| {row['product_name']} | {int(row['eligible_complaints_full_year']):,} | {row['relief_percentage_full_year']:.2f}% | "
-            f"{int(row['eligible_complaints_jan_oct']):,} | {row['relief_percentage_jan_oct']:.2f}% | {diff_str} |"
-        )
-
-    period_summary_str = (
-        f"The largest rate shift observed across all products was {max_diff_abs:.2f} percentage points ({max_diff_prod}: "
-        f"{max_diff_row['relief_percentage_full_year']:.2f}% full year vs. {max_diff_row['relief_percentage_jan_oct']:.2f}% Jan–Oct). "
-        if max_diff_row is not None
-        else "Product-level period sensitivity comparisons are unavailable. "
-    )
-
-    lines.extend(
-        [
-            "",
-            f"{period_summary_str}Across all evaluated product categories, reported-relief rates shifted by at most {max_diff_abs:.2f} percentage points "
-            "between the full year and the 10-month window. Small rate changes across reporting periods show stability within these two "
-            "observation windows, but do not prove that reporting lags have no effect on broader complaint counts.",
-            "",
-            "## Company Benchmark Robustness",
-            "",
-            "SUNWAI's product-aware benchmark compares each company's observed relief rate to an expected rate based on peer-company "
-            "rates across the specific product mix handled by that institution. An independent Python implementation was used to audit "
-            "the SQL query and test benchmark robustness under stricter peer-support requirements and shorter observation windows.",
-            "",
-            "### Benchmark Audit Results",
-            "",
-            f"- **Original SQL benchmark:** {sql_count} qualifying companies (minimum 200 eligible complaints and at least 1 peer per product).",
-            f"- **Independent Python replication:** {audit['py_baseline_count']} companies matched exactly across eligible complaint counts and rate metrics, "
-            f"with a maximum rate discrepancy of {max_rate_disc:.4f} percentage points (within the 0.02 pp rounding threshold).",
-            f"- **Stricter peer support (≥ 20 peers per product):** {py_strict_count} of {sql_count} companies retained ({retention_pct:.1f}% retention). "
-            "All qualifying companies operate in products with substantial peer representation.",
-            f"- **January–October window (≥ 20 peers):** {audit['py_janoct_strict_count']} companies qualified under the 10-month threshold.",
-            "",
-            "### Period Sensitivity for Top Three Companies by Volume",
-            "",
-            "| Company | Full Year 2019 Complaints | Full Year Adjusted Diff (pp) | Jan–Oct 2019 Adjusted Diff (pp) | Shift (pp) |",
-            "| :--- | :---: | :---: | :---: | :---: |",
-        ]
-    )
-
-    for row in audit.get("top3_comparison", []):
-        fy_str = f"{row['full_year_diff_pp']:+.2f}" if row.get("full_year_diff_pp") is not None else "—"
-        jo_str = f"{row['jan_oct_diff_pp']:+.2f}" if row.get("jan_oct_diff_pp") is not None else "—"
-        shift_str = f"{row['shift_pp']:+.2f}" if row.get("shift_pp") is not None else "—"
-        lines.append(
-            f"| {row['company_name']} | {row['eligible_complaints_fy']:,} | {fy_str} | {jo_str} | {shift_str} |"
-        )
-
-    if max_comp_shift is not None:
-        comp_shift_text = (
-            f"Product-mix adjusted rate differences for the compared high-volume companies shifted by at most "
-            f"{max_comp_shift:.2f} percentage points between the full year and the 10-month window."
-        )
-        finding_5_text = (
-            f"5. **Institution-level sensitivity:** Product-mix-adjusted differences for the highest-volume qualifying companies "
-            f"shifted by at most {max_comp_shift:.2f} percentage points across the two reporting periods. These descriptive comparisons "
-            "reflect relative positioning against product peers rather than verified institutional service quality."
-        )
-    else:
-        comp_shift_text = "Period-sensitivity comparison for high-volume companies is unavailable."
-        finding_5_text = "5. **Institution-level sensitivity:** Period-sensitivity comparison for high-volume companies is unavailable."
-
-    lines.extend(
-        [
-            "",
-            comp_shift_text,
-            "",
-            "## Key Findings",
-            "",
-            f"1. **Product-level interval precision:** Estimated 95% Wilson confidence interval widths range from {min_width:.2f} percentage points "
-            f"for {min_width_prod} to {max_width:.2f} percentage points for {max_width_prod}, reflecting sample size precision under binomial sampling assumptions.",
-            f"2. **Product category outcome differences:** Chi-square testing (χ² = {chi2['chi2_stat']:,}, p {chi2['p_value_formatted']}, Cramér's V = {chi2['cramers_v']:.4f}) "
-            "indicates a statistically detectable association between product categories and reported resolution outcomes under test assumptions, with observed product relief "
-            f"rates ranging from {min_rate:.2f}% ({min_rate_prod}) to {max_rate:.2f}% ({max_rate_prod}).",
-            f"3. **Stability across observation periods:** Product-level relief rates shifted by at most {max_diff_abs:.2f} percentage points when "
-            f"comparing the full calendar year against January through October 2019 ({max_diff_prod}: {max_diff_val:+.2f} pp shift).",
-            f"4. **Replicated company benchmark:** The independent Python benchmark matched the SQL benchmark across all {sql_count} qualifying companies "
-            f"(maximum rate discrepancy {max_rate_disc:.4f} pp), with {retention_pct:.1f}% of firms retained under stricter peer-support filtering (≥ 20 peers per product).",
-            finding_5_text,
-            "",
-            "## Limitations",
-            "",
-            "- **Observational self-reporting:** Relief metrics reflect company-submitted resolution codes, not verified consumer satisfaction or problem resolution.",
-            "- **Uncontrolled sub-issue mix:** The product-aware benchmark standardizes for high-level product mix but does not adjust for specific dispute sub-issues or account tenure.",
-            "- **Non-causal interpretation:** Differences in relief rates and benchmark gaps provide exploratory signals for investigation rather than proof of institutional service quality.",
-            "- **Narrative selection:** The analyzed records include only complaints with published narratives, which may overrepresent consumers willing to draft detailed written text.",
-        ]
-    )
-
-    return "\n".join(lines) + "\n"
-
-
 def run_business_analysis(
     config_path: str | Path = "config/settings.yaml",
     sql_output_dir: str | Path = "outputs/sql",
     figures_dir: str | Path = "outputs/figures/business",
-    report_path: str | Path = "reports/business_findings.md",
 ) -> dict[str, Any]:
-    """Execute complete business EDA, statistical tests, benchmark audit, and reporting workflow."""
+    """Run business statistics, benchmark checks, and chart exports."""
     config = load_config(config_path)
     db_file = config.get("data", {}).get("database_file", "data/processed/sunwai.sqlite3")
 
@@ -798,13 +573,6 @@ def run_business_analysis(
         )
         results["created_figures"] = created_figures
 
-        report_md = format_business_findings_report(results)
-        rep_file = Path(report_path)
-        rep_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(rep_file, "w", encoding="utf-8") as f:
-            f.write(report_md)
-        results["report_file"] = str(rep_file).replace("\\", "/")
-
     finally:
         conn.close()
 
@@ -821,9 +589,8 @@ def main() -> None:
     print("Business analysis completed successfully.")
     print(f"Eligible complaints analyzed: {chi2['total_observations']:,}")
     print(f"Chi-square: {chi2['chi2_stat']} (p {chi2['p_value_formatted']}, Cramér's V = {chi2['cramers_v']})")
-    print(f"Benchmark companies audited: {audit['sql_count']} (100% verified)")
+    print(f"Benchmark companies checked: {audit['sql_count']}")
     print(f"Figures generated: {len(figures)} files")
-    print(f"Report written to: {results['report_file']}")
 
 
 if __name__ == "__main__":

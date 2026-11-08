@@ -6,7 +6,7 @@ import sqlite3
 import pandas as pd
 import pytest
 
-from src.analytics.run_sql_analyses import execute_query, format_sql_findings_report
+from src.analytics.run_sql_analyses import execute_query
 
 
 @pytest.fixture
@@ -243,108 +243,4 @@ def test_product_mix_benchmark_excludes_company_with_partial_missing_peers(memor
     assert beta_row["observed_relief_percentage"] == 25.0
     assert beta_row["expected_relief_percentage"] == 50.0
     assert beta_row["diff_percentage_points"] == -25.0
-
-
-def test_format_sql_findings_report_dynamic_values_and_missing_benchmark() -> None:
-    def create_sample_results(top_share: float, min_relief: float, has_benchmark: bool = True) -> dict[str, pd.DataFrame]:
-        monthly = pd.DataFrame([
-            {"month": "2019-01", "complaint_count": 100, "prev_month_count": None, "mom_pct_change": None},
-            {"month": "2019-02", "complaint_count": 120, "prev_month_count": 100, "mom_pct_change": 20.0},
-        ])
-        products = pd.DataFrame([
-            {"product_name": "Specialty Loan", "complaint_count": 150, "percentage": top_share, "volume_rank": 1},
-            {"product_name": "Retail Account", "complaint_count": 70, "percentage": round(100.0 - top_share, 2), "volume_rank": 2},
-        ])
-        relief = pd.DataFrame([
-            {
-                "product_name": "Specialty Loan",
-                "total_complaints": 150,
-                "eligible_complaints": 140,
-                "relief_complaints": 42,
-                "explanation_complaints": 98,
-                "unlabeled_complaints": 10,
-                "relief_percentage": 30.0,
-            },
-            {
-                "product_name": "Retail Account",
-                "total_complaints": 70,
-                "eligible_complaints": 60,
-                "relief_complaints": 6,
-                "explanation_complaints": 54,
-                "unlabeled_complaints": 10,
-                "relief_percentage": min_relief,
-            },
-        ])
-        companies = pd.DataFrame([
-            {"company_name": "Corp One", "total_complaints": 100, "percentage_of_all_complaints": 45.45, "products_represented": 2},
-            {"company_name": "Corp Two", "total_complaints": 70, "percentage_of_all_complaints": 31.82, "products_represented": 1},
-            {"company_name": "Corp Three", "total_complaints": 50, "percentage_of_all_complaints": 22.73, "products_represented": 1},
-        ])
-        timely = pd.DataFrame([
-            {"product_name": "Specialty Loan", "total_complaints": 150, "timely_count": 145, "untimely_count": 5, "unexpected_or_missing_count": 0, "timely_percentage": 96.67},
-            {"product_name": "Retail Account", "total_complaints": 70, "timely_count": 63, "untimely_count": 7, "unexpected_or_missing_count": 0, "timely_percentage": 90.00},
-        ])
-        if has_benchmark:
-            benchmark = pd.DataFrame([
-                {
-                    "company_name": "Corp Leader",
-                    "eligible_complaints": 210,
-                    "products_represented": 2,
-                    "observed_relief_percentage": 35.0,
-                    "expected_relief_percentage": 20.0,
-                    "diff_percentage_points": 15.0,
-                },
-                {
-                    "company_name": "Corp Laggard",
-                    "eligible_complaints": 205,
-                    "products_represented": 1,
-                    "observed_relief_percentage": 10.0,
-                    "expected_relief_percentage": 25.0,
-                    "diff_percentage_points": -15.0,
-                },
-            ])
-        else:
-            benchmark = pd.DataFrame(columns=[
-                "company_name",
-                "eligible_complaints",
-                "products_represented",
-                "observed_relief_percentage",
-                "expected_relief_percentage",
-                "diff_percentage_points",
-            ])
-
-        return {
-            "01_monthly_complaints.sql": monthly,
-            "02_product_distribution.sql": products,
-            "03_product_relief.sql": relief,
-            "04_company_volume.sql": companies,
-            "07_product_mix_benchmark.sql": benchmark,
-            "08_timely_responses.sql": timely,
-        }
-
-    # Case 1: First set of parameters
-    res1 = create_sample_results(top_share=58.25, min_relief=4.50, has_benchmark=True)
-    report1 = format_sql_findings_report(res1)
-    assert "Specialty Loan accounts for 58.25%" in report1
-    assert "4.50% for Retail Account" in report1
-    assert "Corp Leader: 35.00% observed vs. 20.00% expected" in report1
-    assert "Corp Laggard: 10.00% observed vs. 25.00% expected" in report1
-    assert "+15.00 percentage points" in report1
-    assert "-15.00 percentage points" in report1
-
-    # Case 2: Changing the parameters changes the generated report text dynamically
-    res2 = create_sample_results(top_share=64.10, min_relief=8.20, has_benchmark=True)
-    report2 = format_sql_findings_report(res2)
-    assert "Specialty Loan accounts for 64.10%" in report2
-    assert "58.25%" not in report2
-    assert "8.20% for Retail Account" in report2
-    assert "4.50%" not in report2
-
-    # Case 3: Missing benchmark rows does not produce false comparisons or crash
-    res_no_bm = create_sample_results(top_share=50.0, min_relief=5.0, has_benchmark=False)
-    report_no_bm = format_sql_findings_report(res_no_bm)
-    assert "Benchmark comparison is unavailable" in report_no_bm
-    assert "Experian" not in report_no_bm
-    assert "TransUnion" not in report_no_bm
-    assert "0.00 percentage points" not in report_no_bm
 

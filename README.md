@@ -1,141 +1,65 @@
-# SUNWAI — Financial Consumer Complaint Intelligence
+# SUNWAI
 
-## Project Overview
+SUNWAI examines written consumer complaints about financial services. The project uses Python and SQL to find common problems, compare reported company responses, and study the complaint text.
 
-SUNWAI analyzes historical US Consumer Financial Protection Bureau (CFPB) complaints to understand recurring customer issues and evaluate company responses. By combining structured complaint fields with written customer narratives, the project explores patterns in complaints and examines whether narrative text provides useful insights beyond standard category codes.
+The data comes from a historical sample of US consumer complaints published by the Consumer Financial Protection Bureau (CFPB). It is not a study of Indian financial complaints.
 
-The project has completed initial dataset profiling, data preparation, relational database creation, SQL business analysis, business exploratory data analysis (EDA), and complaint narrative text profiling. Using an indexed SQLite database (`data/processed/sunwai.sqlite3`), the project analyzes full-calendar-year 2019 complaint volumes, product distributions, reported relief rates, and product-aware peer company benchmarks. Statistical and robustness checks evaluate sampling uncertainty with Wilson confidence intervals, assess product outcome disparities using chi-square analysis, and audit company benchmarks across observation windows. Complaint narrative processing provides an analytical text dataset and profiles narrative length, CFPB masking placeholders, and repeated template texts across all 117,214 complaints. NLP topic models, machine-learning classifiers, and dashboards have not yet been built.
+## What the project looks at
 
-## Dataset
+- Which financial products receive the most complaints?
+- How often do companies report monetary or non-monetary relief?
+- How do company results compare after accounting for their different product mixes?
+- What can we learn from the written complaints beyond the selected issue categories?
 
-The project uses a historical extract from the CFPB Consumer Complaint Database covering January 2019 through early January 2020. Every record in this extract contains a customer-written complaint narrative submitted online with publication consent.
+## Data
 
-- **Source agency:** [Consumer Financial Protection Bureau (CFPB)](https://www.consumerfinance.gov/data-research/consumer-complaints/)
-- **Historical distribution:** Distributed by Emil Hvitfeldt and Julia Silge for [*Supervised Machine Learning for Text Analysis in R*](https://github.com/EmilHvitfeldt/smltar).
-- **Direct download:** [complaints.csv.gz](https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz)
+The dataset contains 117,214 complaints received between January 1, 2019 and January 9, 2020. Every record has a published complaint narrative. Most business comparisons use only complaints received in 2019 (116,679 records).
 
-## Tools and Technologies
+Download the historical dataset: [complaints.csv.gz](https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz).
 
-- **Python 3.11:** Core programming language.
-- **pandas:** Data manipulation and summary calculations.
-- **SciPy:** Statistical tests of independence and contingency analysis.
-- **Matplotlib:** Business charts and visualization.
-- **SQLite:** Relational database storage for structured complaints and dimension tables.
-- **PyYAML:** Configuration file loading.
-- **pytest:** Unit testing framework.
+This is a selected historical sample, not every CFPB complaint. A company reporting relief does not necessarily mean the consumer was satisfied.
 
-Later stages will add tools for text processing, classical machine learning, and an interactive dashboard (Streamlit).
+## Findings so far
 
-## Project Workflow
+- Credit reporting accounts for 47.29% of complaints in the 2019 sample.
+- Reported relief ranges from 6.43% for mortgage complaints to 28.36% for checking or savings account complaints.
+- Comparing companies by product mix reveals differences that raw complaint counts cannot explain.
+- Some written complaints repeat: 16.27% of records share normalized narrative text with at least one other complaint.
 
-The planned project workflow includes:
+These are observations about this dataset. They do not establish which company gives better service.
 
-1. **Dataset profiling:** Inspecting schema, missing values, record integrity, and category distributions.
-2. **Data preparation:** Cleaning fields, standardizing categories, and resolving duplicate text.
-3. **Relational storage:** Organizing structured complaint records in SQLite for SQL analysis.
-4. **Natural language processing:** Extracting key themes and terms from customer complaint narratives.
-5. **Outcome analysis and modeling:** Evaluating factors associated with company relief responses using classical machine learning.
-6. **Interactive dashboard:** Presenting findings through an exploratory Streamlit application.
+## Run the project
 
-## Getting Started
+Use Python 3.11. Clone the repository and install the requirements:
 
-### Prerequisites
+    git clone https://github.com/nayanojwal0810/SUNWAI.git
+    cd SUNWAI
+    pip install -r requirements.txt
 
-- Python 3.11
-- Git
+Download the file linked above and save it as data/raw/complaints.csv.gz. Then run these commands from the repository root, in order:
 
-### Installation
+    python src/data/profile_complaints.py
+    python -m src.data.prepare_complaints
+    python -m src.data.build_database
+    python -m src.analytics.run_sql_analyses
+    python -m src.analytics.analyze_business
+    python -m src.nlp.prepare_text
+    python -m pytest -q
 
-1. Clone the repository and move into the project directory:
+The scripts create local data files, SQL result tables, and charts. These files are not included in GitHub.
 
-   ```bash
-   git clone https://github.com/nayanojwal0810/SUNWAI.git
-   cd SUNWAI
-   ```
+## Read the results
 
-2. Create and activate a virtual environment:
+- [Data overview](reports/data_profile.md)
+- [Data cleaning](reports/data_preparation.md)
+- [SQL findings](reports/sql_findings.md)
+- [Business and statistical findings](reports/business_findings.md)
+- [Complaint text findings](reports/text_profile.md)
 
-   ```powershell
-   # Windows PowerShell:
-   py -3.11 -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   ```
+For field definitions and database tables, see [data dictionary](docs/data_dictionary.md) and [database guide](docs/database_schema.md).
 
-   ```bash
-   # macOS / Linux:
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+Reports are written summaries of the current dataset. Running the Python scripts does not rewrite them.
 
-3. Install project dependencies:
+## Current work
 
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Place the raw dataset in `data/raw/`:
-
-   ```powershell
-   # Windows PowerShell:
-   New-Item -ItemType Directory -Force -Path data/raw
-   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz" -OutFile "data/raw/complaints.csv.gz"
-   ```
-
-5. Run dataset profiling, data preparation, database creation, SQL analysis, business EDA, text preparation, and tests:
-
-   ```bash
-   python src/data/profile_complaints.py
-   python -m src.data.prepare_complaints
-   python -m src.data.build_database
-   python -m src.analytics.run_sql_analyses
-   python -m src.analytics.analyze_business
-   python -m src.nlp.prepare_text
-   python -m pytest -q
-   ```
-
-## Complaint Narrative Processing
-
-To prepare written customer narratives for NLP modeling, `src/nlp/prepare_text.py` produces an analytical text copy (`text_nlp`) and derives narrative quality metrics stored in `data/processed/complaints_text.csv.gz`:
-
-- **Execution:** `python -m src.nlp.prepare_text`
-- **Findings report:** [Complaint Narrative Profiling Report](reports/text_profile.md)
-- **Key aggregate findings:**
-  - **Total narratives profiled:** 117,214 complaints across the historical extract.
-  - **Median word count:** 116 words per complaint (10th percentile: 31 words; 90th percentile: 393 words). Only 5.07% of narratives contain fewer than 20 words.
-  - **Masking placeholders:** 78.14% of narratives (91,596 complaints) contain CFPB redaction markers (`XXXX`), which were stripped from `text_nlp` to avoid artificial high-frequency terms.
-  - **Repeated narratives:** 16.27% of complaints (19,069 records across 6,051 distinct text groups) belong to repeated narrative groups, concentrated heavily in credit reporting disputes (30.64%).
-- **Modeling rule:** To prevent data leakage across train/test splits, all future machine-learning partitions must be split on `narrative_group_id` rather than naive row-level random splitting. In addition, TF-IDF vectorizers and vocabulary selectors must be fitted strictly on training partitions.
-
-## Project Files
-
-- `sql/schema.sql`: Relational database schema and index definitions for SQLite.
-- `sql/analysis/`: Analytical SQL queries examining monthly volume, product relief, company volume, issues, product-mix benchmarks, and timeliness.
-- `src/data/profile_complaints.py`: Script that inspects the raw dataset and calculates summary statistics.
-- `src/data/prepare_complaints.py`: Script that cleans data fields, maps reported relief outcomes, groups narratives, and exports the processed dataset.
-- `src/data/build_database.py`: Script that initializes the SQLite database, populates dimension and fact tables, and validates data integrity.
-- `src/analytics/run_sql_analyses.py`: Script that executes the SQL analytical queries, exports CSV summaries to `outputs/sql/`, and generates the findings report.
-- `src/analytics/analyze_business.py`: Script that performs business exploratory data analysis, computes Wilson confidence intervals, conducts chi-square tests, audits company benchmarks, and creates visual charts.
-- `src/nlp/prepare_text.py`: Script that normalizes complaint text, removes masking placeholders, calculates token metrics, and exports `complaints_text.csv.gz`.
-- `docs/data_dictionary.md`: [Data Dictionary](docs/data_dictionary.md) explaining all original and prepared dataset columns.
-- `docs/database_schema.md`: [Database Schema](docs/database_schema.md) describing table structures, relationships, and constraints.
-- `reports/data_profile.md`: [Data Profile Report](reports/data_profile.md) detailing dataset quality and distributions.
-- `reports/data_preparation.md`: [Data Preparation Report](reports/data_preparation.md) detailing data cleaning changes, relief label distributions, and validation checks.
-- `reports/sql_findings.md`: [SQL Business Analysis Findings](reports/sql_findings.md) detailing monthly trends, product-level relief rates, and product-mix-adjusted company comparisons.
-- `reports/business_findings.md`: [Business Analysis Findings](reports/business_findings.md) detailing statistical uncertainty, product-level relief confidence intervals, and benchmark robustness across observation windows.
-- `reports/text_profile.md`: [Complaint Narrative Profiling Report](reports/text_profile.md) analyzing narrative length, redaction prevalence, repeated text groups, and product differences.
-- `tests/test_profile_complaints.py`: Unit tests for profiling and verification functions.
-- `tests/test_prepare_complaints.py`: Unit tests for data cleaning, relief mapping, and narrative grouping.
-- `tests/test_build_database.py`: Unit tests for database table creation, foreign key checks, and rebuilding mechanics.
-- `tests/test_sql_analyses.py`: Unit tests for SQL analytical queries, MoM calculations, and product-mix benchmarks.
-- `tests/test_business_analysis.py`: Unit tests for Wilson score intervals, chi-square contingency tests, period sensitivity, and independent benchmark calculations.
-- `tests/test_prepare_text.py`: Unit tests for text normalization, redaction detection, word counting, repeated group statistics, and schema validation.
-- `config/settings.yaml`: Project paths and configuration settings.
-- `requirements.txt`: Initial Python dependencies.
-
-## Data Limitations
-
-- **Selection bias:** The dataset contains only complaints where consumers chose to submit a written narrative online and consented to publish it.
-- **Missing dispute information:** The `consumer_disputed` field is completely empty because the CFPB stopped collecting this information in early 2017.
-- **Duplicate narratives:** Several thousand records share identical complaint text, likely from form letters or batch submissions.
-- **Reporting window:** The data ends on January 9, 2020. January 2020 contains only a partial month of data.
-- **Self-reported outcomes:** Company responses reflect what companies reported to the CFPB, not verified consumer satisfaction.
+Data preparation, SQL analysis, statistics, and text profiling are in place. Complaint themes, predictive models, and an interactive dashboard are planned but not yet completed.

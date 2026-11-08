@@ -242,73 +242,8 @@ def verify_saved_dataset(saved_path: str | Path, expected_df: pd.DataFrame) -> N
         raise ValueError("Reload verification failed: zip code text representation mismatch.")
 
 
-def format_preparation_report(summary: dict[str, Any]) -> str:
-    """Generate Markdown preparation report explaining changes and preserved properties."""
-    records = summary["total_records"]
-    cols = summary["total_columns"]
-    ones = summary["relief_ones"]
-    zeros = summary["relief_zeros"]
-    na_count = summary["relief_na"]
-    groups = summary["distinct_narrative_groups"]
-    repeated_rows = summary["repeated_rows"]
-    repeated_pct = round(repeated_rows / records * 100, 2) if records > 0 else 0.0
-
-    lines = [
-        "# Complaint Dataset Preparation",
-        "",
-        "## 1. Dataset Preparation",
-        "",
-        "- **Source dataset:** `data/raw/complaints.csv.gz`",
-        "- **Cleaned dataset:** `data/processed/complaints_clean.csv.gz`",
-        f"- **Input records:** {records:,}",
-        f"- **Cleaned records:** {records:,}",
-        "- **Input columns:** 18",
-        f"- **Cleaned columns:** {cols}",
-        "",
-        "## 2. Changes Applied",
-        "",
-        "- **Removed empty column:** `consumer_disputed` was verified to be 100.00% missing (all 117,214 values empty) and removed from the analytical dataset.",
-        "- **Standardized identifiers:** Confirmed `complaint_id` contains zero missing and zero duplicate values; stored as standard integer primary key.",
-        "- **Standardized dates:** Parsed `date_received` and `date_sent_to_company` into `YYYY-MM-DD` format with zero invalid or missing values.",
-        "- **Cleaned whitespace:** Trimmed leading and trailing whitespace from string and categorical columns without modifying text casing, wording, or redactions.",
-        "- **Derived reported relief (`reported_relief`):** Created a binary outcome target from `company_response_to_consumer`:",
-        f"  - `1` (Relief): {ones:,} records (monetary or non-monetary relief).",
-        f"  - `0` (No relief): {zeros:,} records (closed with explanation).",
-        f"  - `<NA>` (Untimely / Unlabeled): {na_count:,} records.",
-        "- **Derived narrative grouping (`narrative_group_id`):** Generated a stable SHA-256 hash from normalized narrative text (whitespace collapsed, lowercased) to group identical complaint submissions for evaluation splits.",
-        "",
-        "| Field | Transformation | Result |",
-        "| :--- | :--- | :--- |",
-        "| `consumer_disputed` | Removed | Dropped entirely empty column |",
-        f"| `reported_relief` | Derived binary outcome | {ones:,} relief (1), {zeros:,} no-relief (0), {na_count:,} unlabeled (NA) |",
-        f"| `narrative_group_id` | Derived grouping hash | {groups:,} distinct groups; {repeated_rows:,} records share a group |",
-        "| Categorical / Text | Trimmed whitespace | Preserved original values, casings, and missing indicators |",
-        "| Dates | Standardized format | Parsed YYYY-MM-DD; 0 missing, 0 invalid |",
-        "",
-        "## 3. Data Integrity and Verification",
-        "",
-        f"- **Record preservation:** All {records:,} input complaint records were verified and preserved in the cleaned dataset without dropping rows.",
-        "- **Identifier consistency:** All complaint IDs were validated against the source dataset for complete uniqueness and absence of null values.",
-        "- **Category consistency:** Full distributions of financial products and company responses were confirmed to match the original raw dataset exactly.",
-        f"- **Outcome mapping:** Derived outcomes were independently verified against source response categories ({ones:,} relief, {zeros:,} explanation, {na_count:,} untimely).",
-        f"- **Narrative preservation:** Customer narrative text was preserved with original casing and redactions intact, while generating {groups:,} distinct narrative group hashes to support group-aware modeling splits.",
-        "- **Reload verification:** The exported compressed CSV was reloaded from disk and re-verified for schema integrity, row count, outcome labels, and text fields.",
-        "",
-        "## 4. Important Notes",
-        "",
-        "- **Outcome label availability:** Only closed responses with known relief outcomes are labeled with `1` or `0`. Untimely responses remain unlabeled (`<NA>`) and will be excluded from supervised model training while remaining available for exploratory SQL and dashboard metrics.",
-        "- **Grouping usage:** The `narrative_group_id` column is intended strictly for grouping data during train/validation/test splits. It is not an input feature for predictive models.",
-        f"- **Repeated narrative share:** {repeated_rows:,} records ({repeated_pct:.2f}% of the dataset) share identical normalized narrative text with at least one other record, underscoring the importance of grouped cross-validation.",
-        "- **Preserved narrative text:** The original verbatim complaint narratives are preserved without lowercasing, stopword removal, or tokenization. Text preprocessing will occur during dedicated NLP tasks.",
-        "- **Temporal coverage:** The cleaned dataset retains all records through January 9, 2020. Filtering to complete monthly or annual periods will be performed during time-series analysis.",
-    ]
-
-    return "\n".join(lines) + "\n"
-
-
 def prepare_dataset(
     config_path: str | Path = "config/settings.yaml",
-    output_report_path: str | Path = "reports/data_preparation.md",
 ) -> dict[str, Any]:
     """Execute end-to-end dataset preparation, validation, and export."""
     config = load_config(config_path)
@@ -328,12 +263,6 @@ def prepare_dataset(
     cleaned_df.to_csv(out_file_path, index=False, compression="gzip")
 
     verify_saved_dataset(out_file_path, cleaned_df)
-
-    report_markdown = format_preparation_report(validation_summary)
-    rep_path = Path(output_report_path)
-    rep_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(rep_path, "w", encoding="utf-8") as f:
-        f.write(report_markdown)
 
     return {
         "records": len(cleaned_df),

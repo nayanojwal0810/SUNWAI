@@ -1,45 +1,38 @@
-# Relational Database Schema
+# Database guide
 
-The SUNWAI database organizes cleaned CFPB complaint records into a SQLite relational schema. It separates high-cardinality entities (products, companies, and states) into dimension tables and stores individual complaint events in a central fact table.
+SUNWAI stores the cleaned complaint data in SQLite so SQL queries can compare products, companies, and responses.
 
-## Database Tables
+The database file is data/processed/sunwai.sqlite3.
 
-| Table Name | Type | Description | Primary Key | Row Count |
-| :--- | :--- | :--- | :--- | :---: |
-| `dim_products` | Dimension | Distinct financial product categories | `product_id` | 9 |
-| `dim_companies` | Dimension | Distinct financial institution names | `company_id` | 2,541 |
-| `dim_states` | Dimension | Distinct US state and territory postal codes | `state_id` | 58 |
-| `fact_complaints` | Fact | Individual complaint events and outcomes | `complaint_id` | 117,214 |
+## Tables
 
-## Key Relationships
+| Table | Rows | What it contains |
+| --- | ---: | --- |
+| fact_complaints | 117,214 | One row for each complaint |
+| dim_products | 9 | Product names and their IDs |
+| dim_companies | 2,541 | Company names and their IDs |
+| dim_states | 58 | State and territory codes |
 
-```
-dim_products (product_id) <----+
-                                |
-dim_companies (company_id) <----+--- fact_complaints (product_id, company_id, state_id)
-                                |
-dim_states (state_id) <---------+
-```
+The complaint table stores a product_id, company_id, and state_id instead of repeating those names. SQL joins connect them to the three smaller tables.
 
-- **`fact_complaints.product_id`:** References `dim_products.product_id` (required).
-- **`fact_complaints.company_id`:** References `dim_companies.company_id` (required).
-- **`fact_complaints.state_id`:** References `dim_states.state_id` (nullable). Complaints with missing location data retain `NULL`.
+Each complaint has a unique complaint_id. Product and company IDs must match an existing row in their tables. A missing state is allowed.
 
-## Data Types and Constraints
+## How to use it
 
-- **Foreign key enforcement:** `PRAGMA foreign_keys = ON;` ensures every complaint links to existing product and company records.
-- **Relief outcome constraint:** `reported_relief` includes a CHECK constraint allowing only `0` (closed with explanation), `1` (relief granted), or `NULL` (untimely response).
-- **Date formatting:** Dates are stored as ISO text strings (`YYYY-MM-DD`), allowing SQLite date functions to group complaints by month or year.
-- **Location codes:** ZIP codes are stored as text (e.g., `'012XX'`) to preserve leading zeros.
-- **Missing values:** Optional omitted fields (such as missing states or company public responses) are stored as native SQL `NULL`.
+For example, this query counts complaints by product:
 
-## Building the Database
+    SELECT p.product_name, COUNT(*) AS complaints
+    FROM fact_complaints f
+    JOIN dim_products p ON f.product_id = p.product_id
+    GROUP BY p.product_name
+    ORDER BY complaints DESC;
 
-To create or rebuild the SQLite database from the prepared dataset, run:
+Dates are stored as YYYY-MM-DD text. ZIP codes are stored as text so leading zeros are not lost. reported_relief is 1, 0, or NULL; NULL is excluded when calculating relief rates.
 
-```bash
-python -m src.data.build_database
-```
+## Build the database
 
-The script builds the database using a temporary file and replaces `data/processed/sunwai.sqlite3` only after foreign key and consistency checks pass.
+Run this after preparing the cleaned dataset:
 
+    python -m src.data.build_database
+
+The script checks row counts and table links before replacing the local database file. The SQL queries used for the analysis are in sql/analysis/.

@@ -265,155 +265,10 @@ def compute_product_text_stats(df_clean: pd.DataFrame, df_text: pd.DataFrame) ->
     return stats
 
 
-def format_text_profile_report(
-    overall_stats: dict[str, Any],
-    repeated_stats: dict[str, Any],
-    product_stats: pd.DataFrame,
-) -> str:
-    """Format narrative profiling results into a structured Markdown report."""
-    total_complaints = overall_stats["total_complaints"]
-    nonempty_count = overall_stats["nonempty_narratives"]
-    nonempty_pct = round(100.0 * nonempty_count / total_complaints, 3) if total_complaints > 0 else 0.0
-
-    distinct_groups = repeated_stats["distinct_groups"]
-    repeated_groups = repeated_stats["repeated_groups"]
-    single_groups = distinct_groups - repeated_groups
-    single_group_pct = round(100.0 * single_groups / distinct_groups, 2) if distinct_groups > 0 else 0.0
-
-    min_word_prod = product_stats.loc[product_stats["median_word_count"].idxmin()]
-    max_word_prod = product_stats.loc[product_stats["median_word_count"].idxmax()]
-    min_rep_prod = product_stats.loc[product_stats["repeated_group_percentage"].idxmin()]
-    max_rep_prod = product_stats.loc[product_stats["repeated_group_percentage"].idxmax()]
-    min_redaction_prod = product_stats.loc[product_stats["redaction_percentage"].idxmin()]
-    max_redaction_prod = product_stats.loc[product_stats["redaction_percentage"].idxmax()]
-
-    lines = [
-        "# Complaint Narrative Quality and Profiling Report",
-        "",
-        "## 1. Text Dataset Overview",
-        "",
-        "This report profiles the customer-written complaint narratives in the prepared SUNWAI dataset. "
-        f"The analytical scope covers the full historical extract of {total_complaints:,} complaints (January 1, 2019 through "
-        "January 9, 2020), which differs from the calendar-year-2019 business analysis window. Every record in this "
-        "extract contains an original narrative submitted online with consumer consent.",
-        "",
-        f"- **Total complaint records:** {total_complaints:,}",
-        f"- **Nonempty processed narratives (`text_nlp`):** {nonempty_count:,} ({nonempty_pct:.3f}%)",
-        f"- **Empty processed narratives:** {overall_stats['empty_narratives']:,} (records where narratives consisted "
-        "exclusively of masking placeholders and whitespace)",
-        f"- **Masking placeholder rate:** {overall_stats['redacted_percentage']:.2f}% of narratives ({overall_stats['redacted_count']:,} records)",
-        "",
-        "### Text Processing Method",
-        "",
-        "The prepared text field (`text_nlp`) is an analytical copy derived from `consumer_complaint_narrative` using "
-        "lightweight standard transformations:",
-        "",
-        "1. **Lowercase conversion:** Standardized using lowercase transformation.",
-        "2. **Whitespace normalization:** Line breaks, tabs, and repeated spaces collapsed to single spaces.",
-        "3. **Masking placeholder removal:** CFPB redaction strings consisting of runs of four or more `X` characters "
-        "not immediately adjacent to alphabetic letters were removed from `text_nlp` to avoid artificial high-frequency terms.",
-        "4. **Trimming:** Leading and trailing whitespace removed.",
-        "",
-        "Normal punctuation, negation words (e.g., 'not', 'never', 'did not'), financial numbers, and domain vocabulary "
-        "were strictly preserved to retain semantic context for future NLP tasks.",
-        "",
-        "## 2. Narrative Quality",
-        "",
-        "Narratives exhibit substantial variation in length, ranging from brief notices to multi-page dispute descriptions. "
-        "Word counts are calculated using a consistent regex token-counting rule (`\\b\\w+\\b`).",
-        "",
-        "| Metric | Value |",
-        "| :--- | :---: |",
-        f"| Median character count | {overall_stats['median_char_count']:.0f} characters |",
-        f"| Median word count | {overall_stats['median_word_count']:.0f} words |",
-        f"| 10th percentile word count | {overall_stats['p10_word_count']:.0f} words |",
-        f"| 90th percentile word count | {overall_stats['p90_word_count']:.0f} words |",
-        f"| Short narratives (< 20 words) | {overall_stats['short_text_count']:,} ({overall_stats['short_text_percentage']:.2f}%) |",
-        f"| Masked narratives (containing `XXXX`) | {overall_stats['redacted_count']:,} ({overall_stats['redacted_percentage']:.2f}%) |",
-        "",
-        f"The median complaint contains {overall_stats['median_word_count']:.0f} words, while the middle 80% spans from "
-        f"{overall_stats['p10_word_count']:.0f} to {overall_stats['p90_word_count']:.0f} words. Complaints with fewer than 20 words "
-        f"account for {overall_stats['short_text_percentage']:.2f}% of all narratives, indicating that most records contain "
-        "multi-sentence descriptions.",
-        "",
-        "## 3. Repeated Narratives",
-        "",
-        "Using the stable `narrative_group_id` (derived from lowercased, whitespace-collapsed original narratives), "
-        "repeated complaint texts were analyzed across the historical extract:",
-        "",
-        "| Metric | Value |",
-        "| :--- | :---: |",
-        f"| Distinct narrative groups | {distinct_groups:,} |",
-        f"| Groups appearing more than once | {repeated_groups:,} |",
-        f"| Complaints belonging to repeated groups | {repeated_stats['records_in_repeated_groups']:,} |",
-        f"| Share of complaints in repeated groups | {repeated_stats['repeated_records_percentage']:.2f}% |",
-        f"| Largest group size | {repeated_stats['largest_group_size']:,} complaints |",
-        "",
-        f"Across the historical extract, {single_group_pct:.2f}% of distinct narrative groups appear exactly once, while repeated "
-        f"groups account for {repeated_stats['repeated_records_percentage']:.2f}% of all complaint records. Because consumers "
-        "or submitting representatives sometimes submit identical narrative text for separate filings, these identical records "
-        "are preserved in full. However, identical narratives across multiple records require group-aware partitioning in downstream modeling.",
-        "",
-        "## 4. Differences Across Products",
-        "",
-        "Text characteristics differ substantially across financial product lines:",
-        "",
-        "| Financial Product | Complaints | Median Words | Masking Rate | Repeated Narrative % |",
-        "| :--- | :---: | :---: | :---: | :---: |",
-    ]
-
-    for _, row in product_stats.iterrows():
-        lines.append(
-            f"| {row['product']} | {int(row['complaint_count']):,} | {row['median_word_count']:.0f} | "
-            f"{row['redaction_percentage']:.2f}% | {row['repeated_group_percentage']:.2f}% |"
-        )
-
-    lines.extend(
-        [
-            "",
-            "### Observations",
-            "",
-            f"- **Text length disparity:** Median length varies across products, ranging from {min_word_prod['median_word_count']:.0f} words in "
-            f"{min_word_prod['product']} to {max_word_prod['median_word_count']:.0f} words in {max_word_prod['product']}.",
-            f"- **Repetition concentration:** Repeated narrative shares differ markedly by product, peaking at "
-            f"{max_rep_prod['repeated_group_percentage']:.2f}% in {max_rep_prod['product']} compared to "
-            f"{min_rep_prod['repeated_group_percentage']:.2f}% in {min_rep_prod['product']}. The high repetition rate in "
-            "credit-reporting complaints suggests that repeated or template-like wording may influence topic discovery.",
-            f"- **Placeholder prevalence:** Masking placeholders are widespread across all product categories, with rates ranging from "
-            f"{min_redaction_prod['redaction_percentage']:.2f}% in {min_redaction_prod['product']} to "
-            f"{max_redaction_prod['redaction_percentage']:.2f}% in {max_redaction_prod['product']}.",
-            "",
-            "## 5. Implications for NLP and Modeling",
-            "",
-            "The narrative profile establishes critical methodological boundaries for subsequent NLP and machine learning stages:",
-            "",
-            f"1. **Group-aware data partitioning:** Because {repeated_stats['repeated_records_percentage']:.2f}% of complaints belong to "
-            "repeated narrative groups, naive random train/test splitting would leak identical narratives across folds, inflating evaluation metrics. "
-            "Splits must partition on `narrative_group_id`.",
-            "2. **Vocabulary fitting on training splits only:** TF-IDF vectorizers, topic models, and vocabulary selectors must be fitted "
-            "strictly on training folds and transformed on validation/test folds without data leakage.",
-            "3. **Influence of repeated narratives on topic discovery:** Given the concentration of identical narratives in certain products, "
-            "theme discovery should evaluate both the full dataset and unique-narrative subsets to observe how repeated wording affects extracted topics.",
-            "4. **Preservation of original narratives:** The original `consumer_complaint_narrative` remains available in the clean dataset, "
-            "while `text_nlp` serves as a clean baseline representation for tokenization and vectorization.",
-            "",
-            "## 6. Limitations",
-            "",
-            "- **Selection bias:** The dataset represents only consumers who submitted narratives online and opted to make them public.",
-            "- **Masking artifacts:** Removing standalone `XXXX` placeholders removes redaction symbols but cannot reconstruct masked numbers, dates, or entity names.",
-            "- **Descriptive word metrics:** Word counts reflect regex-based token counts rather than syntactic or semantic complexity.",
-            "- **Observational scope:** Repeated narratives reflect shared text patterns, not verified consumer satisfaction or complaint validity.",
-        ]
-    )
-
-    return "\n".join(lines) + "\n"
-
-
 def run_text_preparation(
     config_path: str | Path = "config/settings.yaml",
-    report_path: str | Path = "reports/text_profile.md",
 ) -> dict[str, Any]:
-    """Execute complete narrative preparation, profiling, validation, and reporting workflow."""
+    """Prepare text, save it, and return text-quality measurements."""
     config = load_config(config_path)
     clean_file = config.get("data", {}).get("clean_file", "data/processed/complaints_clean.csv.gz")
     text_file = config.get("data", {}).get("text_file", "data/processed/complaints_text.csv.gz")
@@ -432,17 +287,10 @@ def run_text_preparation(
     repeated_stats = compute_repeated_narrative_stats(df_text)
     product_stats = compute_product_text_stats(df_clean, df_text)
 
-    report_markdown = format_text_profile_report(overall_stats, repeated_stats, product_stats)
-    rep_file = Path(report_path)
-    rep_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(rep_file, "w", encoding="utf-8") as f:
-        f.write(report_markdown)
-
     return {
         "input_rows": len(df_clean),
         "output_rows": len(df_text),
         "text_file": str(text_file).replace("\\", "/"),
-        "report_file": str(report_path).replace("\\", "/"),
         "overall_stats": overall_stats,
         "repeated_stats": repeated_stats,
         "product_stats": product_stats,
@@ -462,7 +310,6 @@ def main() -> None:
     print(f"Redaction rate: {overall['redacted_percentage']:.2f}%")
     print(f"Repeated narratives: {repeated['records_in_repeated_groups']:,} records in {repeated['repeated_groups']:,} groups ({repeated['repeated_records_percentage']:.2f}%)")
     print(f"Output saved to: {results['text_file']}")
-    print(f"Report generated: {results['report_file']}")
 
 
 if __name__ == "__main__":

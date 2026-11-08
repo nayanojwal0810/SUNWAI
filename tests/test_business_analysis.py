@@ -12,7 +12,6 @@ from src.analytics.analyze_business import (
     compute_company_benchmark,
     compute_product_period_sensitivity,
     compute_product_relief_intervals,
-    format_business_findings_report,
     perform_chi_square_test,
 )
 
@@ -293,127 +292,6 @@ def test_period_sensitivity_date_filtering(memory_db: sqlite3.Connection) -> Non
     # Difference: 50.0 - 100.0 = -50.0 pp
     assert row["diff_percentage_points"] == -50.0
     assert row["abs_diff_pp"] == 50.0
-
-
-def test_format_business_findings_report_dynamic_statements() -> None:
-    def create_mock_results(
-        min_width: float,
-        max_width: float,
-        min_rate: float,
-        max_rate: float,
-        period_shift: float,
-        strict_retention_count: int,
-        comp_shift: float,
-    ) -> dict:
-        ci_df = pd.DataFrame([
-            {
-                "product_name": "Product Alpha",
-                "eligible_complaints": 1000,
-                "relief_complaints": int(1000 * min_rate / 100.0),
-                "relief_percentage": min_rate,
-                "ci_lower": min_rate - min_width / 2,
-                "ci_upper": min_rate + min_width / 2,
-                "ci_width": min_width,
-            },
-            {
-                "product_name": "Product Beta",
-                "eligible_complaints": 500,
-                "relief_complaints": int(500 * max_rate / 100.0),
-                "relief_percentage": max_rate,
-                "ci_lower": max_rate - max_width / 2,
-                "ci_upper": max_rate + max_width / 2,
-                "ci_width": max_width,
-            },
-        ])
-        chi2 = {
-            "chi2_stat": 123.4567,
-            "dof": 1,
-            "p_value": 0.00001,
-            "p_value_formatted": "< 0.0001",
-            "total_observations": 1500,
-            "cramers_v": 0.2869,
-        }
-        period_df = pd.DataFrame([
-            {
-                "product_name": "Product Alpha",
-                "eligible_complaints_full_year": 1000,
-                "relief_percentage_full_year": min_rate,
-                "eligible_complaints_jan_oct": 900,
-                "relief_percentage_jan_oct": min_rate - period_shift,
-                "diff_percentage_points": period_shift,
-                "abs_diff_pp": abs(period_shift),
-            }
-        ])
-        audit = {
-            "sql_count": 10,
-            "py_baseline_count": 10,
-            "py_strict_count": strict_retention_count,
-            "py_janoct_strict_count": 8,
-            "max_rate_discrepancy": 0.0000,
-            "top3_comparison": [
-                {
-                    "company_name": "Corp One",
-                    "eligible_complaints_fy": 500,
-                    "full_year_diff_pp": 10.0,
-                    "jan_oct_diff_pp": 10.0 + comp_shift,
-                    "shift_pp": comp_shift,
-                    "qualifies_both": True,
-                }
-            ],
-        }
-        return {
-            "product_relief_ci": ci_df,
-            "chi_square": chi2,
-            "product_period_sensitivity": period_df,
-            "benchmark_audit": audit,
-        }
-
-    # Case 1: First set of parameters
-    res1 = create_mock_results(
-        min_width=1.25,
-        max_width=3.75,
-        min_rate=8.50,
-        max_rate=32.40,
-        period_shift=0.85,
-        strict_retention_count=8,  # 8 / 10 = 80.0%
-        comp_shift=0.45,
-    )
-    rep1 = format_business_findings_report(res1)
-    assert "1.25 percentage points" in rep1
-    assert "3.75 percentage points" in rep1
-    assert "8.50%" in rep1
-    assert "32.40%" in rep1
-    assert "0.85 percentage points" in rep1
-    assert "80.0% retention" in rep1
-    assert "0.45 percentage points" in rep1
-
-    # Case 2: Changed parameters update the text dynamically
-    res2 = create_mock_results(
-        min_width=2.10,
-        max_width=5.80,
-        min_rate=12.20,
-        max_rate=45.60,
-        period_shift=1.45,
-        strict_retention_count=6,  # 6 / 10 = 60.0%
-        comp_shift=0.92,
-    )
-    rep2 = format_business_findings_report(res2)
-    assert "2.10 percentage points" in rep2
-    assert "5.80 percentage points" in rep2
-    assert "12.20%" in rep2
-    assert "45.60%" in rep2
-    assert "1.45 percentage points" in rep2
-    assert "60.0% retention" in rep2
-    assert "0.92 percentage points" in rep2
-
-    # Prior values should no longer appear in rep2
-    assert "1.25 percentage points" not in rep2
-    assert "3.75 percentage points" not in rep2
-    assert "80.0% retention" not in rep2
-
-    # Verify absence of overconfident statements
-    assert "genuine distributional variation" not in rep2.lower()
-    assert "proving the result is not an artifact" not in rep2.lower()
 
 
 def test_audit_company_benchmark_detects_rate_mismatch(memory_db: sqlite3.Connection) -> None:

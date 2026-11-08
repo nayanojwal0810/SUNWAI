@@ -1,88 +1,45 @@
-# Complaint Narrative Quality and Profiling Report
+# Complaint text findings
 
-## 1. Text Dataset Overview
+## What we analyzed
 
-This report profiles the customer-written complaint narratives in the prepared SUNWAI dataset. The analytical scope covers the full historical extract of 117,214 complaints (January 1, 2019 through January 9, 2020), which differs from the calendar-year-2019 business analysis window. Every record in this extract contains an original narrative submitted online with consumer consent.
+We examined the written narratives in all 117,214 complaints, including the partial January 2020 period. This differs from the 2019-only business analysis.
 
-- **Total complaint records:** 117,214
-- **Nonempty processed narratives (`text_nlp`):** 117,210 (99.997%)
-- **Empty processed narratives:** 4 (records where narratives consisted exclusively of masking placeholders and whitespace)
-- **Masking placeholder rate:** 78.01% of narratives (91,434 records)
+We made a separate text copy for analysis. It uses lowercase letters, removes repeated spaces, and removes XXXX-style masking markers when they are not part of ordinary words. The original narrative remains in the cleaned file.
 
-### Text Processing Method
+## How much text is available?
 
-The prepared text field (`text_nlp`) is an analytical copy derived from `consumer_complaint_narrative` using lightweight standard transformations:
+| Measure | Result |
+| --- | ---: |
+| Narratives with text after processing | 117,210 |
+| Narratives empty after processing | 4 |
+| Median length | 116 words |
+| 10th to 90th percentile | 31–393 words |
+| Narratives shorter than 20 words | 5,938 (5.07%) |
+| Narratives containing masking markers | 91,434 (78.01%) |
 
-1. **Lowercase conversion:** Standardized using lowercase transformation.
-2. **Whitespace normalization:** Line breaks, tabs, and repeated spaces collapsed to single spaces.
-3. **Masking placeholder removal:** CFPB redaction strings consisting of runs of four or more `X` characters not immediately adjacent to alphabetic letters were removed from `text_nlp` to avoid artificial high-frequency terms.
-4. **Trimming:** Leading and trailing whitespace removed.
+Most complaints contain more than a short sentence, but their length and wording vary widely. Longer text does not necessarily describe a more serious problem.
 
-Normal punctuation, negation words (e.g., 'not', 'never', 'did not'), financial numbers, and domain vocabulary were strictly preserved to retain semantic context for future NLP tasks.
+## How often does text repeat?
 
-## 2. Narrative Quality
+| Measure | Result |
+| --- | ---: |
+| Different normalized narrative groups | 104,196 |
+| Groups used by more than one complaint | 6,051 |
+| Complaints in those repeated groups | 19,069 (16.27%) |
+| Largest repeated group | 442 complaints |
 
-Narratives exhibit substantial variation in length, ranging from brief notices to multi-page dispute descriptions. Word counts are calculated using a consistent regex token-counting rule (`\b\w+\b`).
+Repeated wording is particularly common in credit reporting: 30.64% of those complaints belong to repeated groups. The corresponding share for mortgage complaints is 0.28%.
 
-| Metric | Value |
-| :--- | :---: |
-| Median character count | 641 characters |
-| Median word count | 116 words |
-| 10th percentile word count | 31 words |
-| 90th percentile word count | 393 words |
-| Short narratives (< 20 words) | 5,938 (5.07%) |
-| Masked narratives (containing `XXXX`) | 91,434 (78.01%) |
+This tells us repetition may affect which themes a text model finds. It does not tell us who wrote the complaints or why the wording matches.
 
-The median complaint contains 116 words, while the middle 80% spans from 31 to 393 words. Complaints with fewer than 20 words account for 5.07% of all narratives, indicating that most records contain multi-sentence descriptions.
+## Differences in text length
 
-## 3. Repeated Narratives
+Mortgage complaints have the longest median narrative among the products in this extract, at 218 words. Credit reporting complaints have the shortest median, at 86 words.
 
-Using the stable `narrative_group_id` (derived from lowercased, whitespace-collapsed original narratives), repeated complaint texts were analyzed across the historical extract:
+Masking markers are common across products. The highest measured rate is 87.16% in money transfer complaints.
 
-| Metric | Value |
-| :--- | :---: |
-| Distinct narrative groups | 104,196 |
-| Groups appearing more than once | 6,051 |
-| Complaints belonging to repeated groups | 19,069 |
-| Share of complaints in repeated groups | 16.27% |
-| Largest group size | 442 complaints |
+## What needs care later?
 
-Across the historical extract, 94.19% of distinct narrative groups appear exactly once, while repeated groups account for 16.27% of all complaint records. Because consumers or submitting representatives sometimes submit identical narrative text for separate filings, these identical records are preserved in full. However, identical narratives across multiple records require group-aware partitioning in downstream modeling.
+We should compare theme results with and without counting repeated narratives more than once. For predictive models, matching narratives must be kept in the same training, validation, or test group. Text vocabularies must be learned from training data only.
 
-## 4. Differences Across Products
-
-Text characteristics differ substantially across financial product lines:
-
-| Financial Product | Complaints | Median Words | Masking Rate | Repeated Narrative % |
-| :--- | :---: | :---: | :---: | :---: |
-| Credit reporting, credit repair services, or other personal consumer reports | 55,558 | 86 | 75.82% | 30.64% |
-| Debt collection | 22,287 | 111 | 75.64% | 7.49% |
-| Credit card or prepaid card | 11,571 | 172 | 79.60% | 2.01% |
-| Mortgage | 9,449 | 218 | 86.77% | 0.28% |
-| Checking or savings account | 6,915 | 178 | 82.92% | 0.36% |
-| Student loan | 3,941 | 173 | 79.52% | 0.30% |
-| Vehicle loan or lease | 2,713 | 174 | 81.46% | 1.25% |
-| Money transfer, virtual currency, or money service | 2,563 | 163 | 87.16% | 0.78% |
-| Payday loan, title loan, or personal loan | 2,217 | 142 | 77.94% | 1.26% |
-
-### Observations
-
-- **Text length disparity:** Median length varies across products, ranging from 86 words in Credit reporting, credit repair services, or other personal consumer reports to 218 words in Mortgage.
-- **Repetition concentration:** Repeated narrative shares differ markedly by product, peaking at 30.64% in Credit reporting, credit repair services, or other personal consumer reports compared to 0.28% in Mortgage. The high repetition rate in credit-reporting complaints suggests that repeated or template-like wording may influence topic discovery.
-- **Placeholder prevalence:** Masking placeholders are widespread across all product categories, with rates ranging from 75.64% in Debt collection to 87.16% in Money transfer, virtual currency, or money service.
-
-## 5. Implications for NLP and Modeling
-
-The narrative profile establishes critical methodological boundaries for subsequent NLP and machine learning stages:
-
-1. **Group-aware data partitioning:** Because 16.27% of complaints belong to repeated narrative groups, naive random train/test splitting would leak identical narratives across folds, inflating evaluation metrics. Splits must partition on `narrative_group_id`.
-2. **Vocabulary fitting on training splits only:** TF-IDF vectorizers, topic models, and vocabulary selectors must be fitted strictly on training folds and transformed on validation/test folds without data leakage.
-3. **Influence of repeated narratives on topic discovery:** Given the concentration of identical narratives in certain products, theme discovery should evaluate both the full dataset and unique-narrative subsets to observe how repeated wording affects extracted topics.
-4. **Preservation of original narratives:** The original `consumer_complaint_narrative` remains available in the clean dataset, while `text_nlp` serves as a clean baseline representation for tokenization and vectorization.
-
-## 6. Limitations
-
-- **Selection bias:** The dataset represents only consumers who submitted narratives online and opted to make them public.
-- **Masking artifacts:** Removing standalone `XXXX` placeholders removes redaction symbols but cannot reconstruct masked numbers, dates, or entity names.
-- **Descriptive word metrics:** Word counts reflect regex-based token counts rather than syntactic or semantic complexity.
-- **Observational scope:** Repeated narratives reflect shared text patterns, not verified consumer satisfaction or complaint validity.
+The text-processing step does not identify topics or sentiment. Those analyses have not been completed.

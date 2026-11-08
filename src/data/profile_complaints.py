@@ -240,135 +240,10 @@ def compute_categorical_metrics(df: pd.DataFrame) -> dict[str, Any]:
     return results
 
 
-def format_markdown_report(profile: dict[str, Any]) -> str:
-    """Format computed metrics into a clean, readable Markdown report."""
-    struct = profile.get("structure", {})
-    integrity = profile.get("integrity", {})
-    dates = profile.get("dates", {})
-    categories = profile.get("categories", {})
-
-    total_rows = struct.get("total_rows", 0)
-    total_cols = struct.get("total_columns", 0)
-
-    received_dates = dates.get("date_received", {})
-    date_range = f"{received_dates.get('earliest_date', 'N/A')} to {received_dates.get('latest_date', 'N/A')}"
-
-    products = categories.get("products", [])
-    responses = categories.get("company_responses", [])
-    top_companies = categories.get("top_companies", [])
-    distinct_companies = categories.get("distinct_companies", 0)
-
-    # Missing counts for key fields
-    cols_by_name = {c["column_name"]: c for c in struct.get("columns", [])}
-    disputed_missing = cols_by_name.get("consumer_disputed", {}).get("missing_percentage", 0.0)
-    tags_missing = cols_by_name.get("tags", {}).get("missing_percentage", 0.0)
-    resp_missing = cols_by_name.get("company_public_response", {}).get("missing_percentage", 0.0)
-    zip_missing = cols_by_name.get("zip_code", {}).get("missing_percentage", 0.0)
-
-    credit_rep_pct = next((p["percentage"] for p in products if "Credit reporting" in p["category"]), 0.0)
-    debt_coll_pct = next((p["percentage"] for p in products if "Debt collection" in p["category"]), 0.0)
-    closed_exp_pct = next((r["percentage"] for r in responses if "Closed with explanation" in r["category"]), 0.0)
-    relief_pct = round(
-        sum(r["percentage"] for r in responses if "relief" in r["category"].lower()),
-        2,
-    )
-    top3_share = round(sum(c["percentage"] for c in top_companies[:3]), 2)
-
-    repeated_texts = integrity.get("repeated_narrative_texts", 0)
-    repeated_rows = integrity.get("repeated_narrative_rows", 0)
-    repeated_rows_pct = round(repeated_rows / total_rows * 100, 2) if total_rows > 0 else 0.0
-    jan_2020_count = categories.get("jan_2020_count", 0)
-
-    lines = [
-        "# Complaint Dataset Profile",
-        "",
-        "### Dataset Overview",
-        "",
-        f"- **Total records:** {total_rows:,}",
-        f"- **Total fields:** {total_cols}",
-        f"- **Date range:** {date_range}",
-        f"- **Financial products:** {len(products)}",
-        f"- **Financial companies:** {distinct_companies:,}",
-        "",
-        "### Data Quality",
-        "",
-        "| Field / Check | Metric | Description |",
-        "| :--- | :---: | :--- |",
-        f"| `complaint_id` uniqueness | {integrity.get('id_duplicate_count', 0)} duplicates | Every record has a unique identifier with 0 missing |",
-        f"| Narrative presence | {integrity.get('narrative_coverage_pct', 0.0):.2f}% | All {total_rows:,} records include non-empty narrative text |",
-        f"| Repeated narratives | {repeated_rows:,} records | {repeated_texts:,} unique narrative texts appear multiple times |",
-        f"| Date fields | 0 missing | Both received and sent dates are completely populated |",
-        f"| `consumer_disputed` | {disputed_missing:.2f}% missing | Field is entirely empty across all records |",
-        f"| `tags` | {tags_missing:.2f}% missing | Optional demographic segment indicators |",
-        f"| `company_public_response` | {resp_missing:.2f}% missing | Optional public statement from company |",
-        f"| `zip_code` | {zip_missing:.2f}% missing | Partially masked or omitted location data |",
-        "",
-        "### Complaint Distribution",
-        "",
-        "#### Financial Products",
-        "",
-        "| Product Category | Complaints | Share |",
-        "| :--- | :---: | :---: |",
-    ]
-
-    for p in products:
-        lines.append(f"| {p['category']} | {p['count']:,} | {p['percentage']:.2f}% |")
-
-    lines.extend(
-        [
-            "",
-            "#### Company Responses",
-            "",
-            "| Company Response Category | Complaints | Share |",
-            "| :--- | :---: | :---: |",
-        ]
-    )
-
-    for r in responses:
-        lines.append(f"| {r['category']} | {r['count']:,} | {r['percentage']:.2f}% |")
-
-    lines.extend(
-        [
-            "",
-            "#### Top 10 Companies by Complaint Volume",
-            "",
-            "| Company | Complaints | Share |",
-            "| :--- | :---: | :---: |",
-        ]
-    )
-
-    for c in top_companies:
-        lines.append(f"| {c['category']} | {c['count']:,} | {c['percentage']:.2f}% |")
-
-    lines.extend(
-        [
-            "",
-            "### Key Findings",
-            "",
-            f"1. **Full narrative coverage:** All {total_rows:,} complaints include customer-written narratives submitted online with publication consent.",
-            f"2. **Heavy credit reporting volume:** Credit reporting represents {credit_rep_pct:.2f}% of complaints, followed by debt collection at {debt_coll_pct:.2f}%.",
-            f"3. **Company concentration:** Three nationwide credit reporting agencies (TransUnion, Equifax, Experian) account for {top3_share:.2f}% of all complaints.",
-            f"4. **Response outcomes:** Most complaints ({closed_exp_pct:.2f}%) were closed with an explanation, while monetary or non-monetary relief was reported in {relief_pct:.2f}% of cases.",
-            f"5. **Repeated texts:** There are {repeated_texts:,} unique narrative texts that appear multiple times, covering {repeated_rows:,} records ({repeated_rows_pct:.2f}% of the dataset).",
-            "",
-            "### Limitations",
-            "",
-            f"- **Historical extract:** The data spans January 1, 2019 to January 9, 2020. January 2020 contains only {jan_2020_count:,} records and does not represent a full month.",
-            "- **Narrative-only sample:** Records include only consumers who opted to publish written narratives, which is a subset of all CFPB complaints.",
-            "- **Unpopulated dispute field:** The `consumer_disputed` column contains no data and cannot be used for analysis or outcome modeling.",
-            "- **Repeated text:** Identical complaints should be grouped or handled during dataset splitting to avoid evaluating models on duplicate texts.",
-            "- **Self-reported outcomes:** Company responses reflect categories reported by institutions rather than independently verified consumer satisfaction.",
-        ]
-    )
-
-    return "\n".join(lines) + "\n"
-
-
 def profile_dataset(
     config_path: str | Path = "config/settings.yaml",
-    output_report_path: str | Path = "reports/data_profile.md",
 ) -> dict[str, Any]:
-    """Profile the complaint dataset and write the summary Markdown report."""
+    """Calculate the dataset profile and return its measurements."""
     config = load_config(config_path)
     raw_file = config.get("data", {}).get("raw_file", "data/raw/complaints.csv.gz")
     expected_sha = config.get("source", {}).get("expected_sha256", "")
@@ -391,13 +266,6 @@ def profile_dataset(
         "categories": categorical_metrics,
     }
 
-    report_markdown = format_markdown_report(profile_results)
-
-    out_path = Path(output_report_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as file:
-        file.write(report_markdown)
-
     return profile_results
 
 
@@ -408,7 +276,6 @@ def main() -> None:
     cols = results["structure"]["total_columns"]
     print("Dataset profiling completed.")
     print(f"Records: {rows:,} | Columns: {cols}")
-    print("Report: reports/data_profile.md")
 
 
 if __name__ == "__main__":

@@ -1,59 +1,58 @@
-# Complaint Dataset Data Dictionary
+# Data dictionary
 
-This document explains the 18 columns in the historical Consumer Financial Protection Bureau (CFPB) complaints dataset (`complaints.csv.gz`). The dataset covers complaints received between January 1, 2019 and January 9, 2020.
+This page explains the fields used in SUNWAI. The source file contains 18 columns. The cleaned file keeps 17 of them and adds two new fields.
 
-| Column Name | Description | Data Type | Missing | Project Role |
-| :--- | :--- | :--- | :---: | :--- |
-| `date_received` | Date the CFPB received the complaint | Date (`YYYY-MM-DD`) | 0.00% | Timeline tracking and monthly trends |
-| `product` | Main financial product or service | Categorical text | 0.00% | Primary grouping category |
-| `sub_product` | Specific product type | Categorical text | 0.00% | Detailed product filtering |
-| `issue` | High-level problem chosen from a predefined menu | Categorical text | 0.00% | Problem categorization |
-| `sub_issue` | Specific secondary problem chosen from a menu | Categorical text | 13.45% | Granular problem analysis |
-| `consumer_complaint_narrative` | Customer's written complaint description | Text | 0.00% | NLP analysis and text feature modeling |
-| `company_public_response` | Optional public statement from the company | Categorical text | 47.91% | Public response pattern analysis |
-| `company` | Legal name of the financial company | Categorical text | 0.00% | Company-level complaint volume comparisons |
-| `state` | Consumer's state or territory postal code | Categorical text | 0.44% | Geographic distribution |
-| `zip_code` | First three digits of consumer's ZIP code | Masked text (`XX`) | 22.35% | Regional location analysis |
-| `tags` | Optional demographic segment indicators | Categorical text | 83.18% | Segment analysis (older Americans, servicemembers) |
-| `consumer_consent_provided` | Confirmation that consumer agreed to share text | Categorical text | 0.00% | Verification indicator (constant across dataset) |
-| `submitted_via` | Intake submission channel | Categorical text | 0.00% | Intake channel (all `Web` in this extract) |
-| `date_sent_to_company` | Date the CFPB forwarded complaint to company | Date (`YYYY-MM-DD`) | 0.00% | Latency calculation (`sent` minus `received`) |
-| `company_response_to_consumer` | Formal resolution outcome reported by company | Categorical text | 0.00% | Target label mapping for relief classification |
-| `timely_response` | Whether the company responded on time | Categorical text (`Yes`/`No`) | 0.00% | Timeliness metric (post-intake outcome) |
-| `consumer_disputed` | Historical flag for consumer dispute of outcome | Float / Boolean | 100.00% | Not usable (CFPB discontinued field in 2017) |
-| `complaint_id` | Unique identifier assigned to each complaint | Integer | 0.00% | Primary key and table joins |
+## Source complaint fields
 
-## Prepared Dataset Fields
+| Field | Meaning |
+| --- | --- |
+| date_received | Date the CFPB received the complaint |
+| product | Main type of financial product |
+| sub_product | More specific product type |
+| issue | Problem selected by the consumer |
+| sub_issue | More detailed problem, when available |
+| consumer_complaint_narrative | Written description of the complaint |
+| company_public_response | Optional statement made public by the company |
+| company | Company named in the complaint |
+| state | State or territory code, when available |
+| zip_code | Partly hidden ZIP code; stored as text |
+| tags | Optional labels such as older consumer or servicemember |
+| consumer_consent_provided | Whether publication consent was provided |
+| submitted_via | How the complaint was submitted |
+| date_sent_to_company | Date the complaint was sent to the company |
+| company_response_to_consumer | Company's reported response category |
+| timely_response | Whether the response was on time |
+| consumer_disputed | Old dispute field; empty throughout this dataset |
+| complaint_id | Unique number for a complaint |
 
-The prepared dataset (`data/processed/complaints_clean.csv.gz`) excludes `consumer_disputed` because the column has no values (100.00% missing). It retains all other 17 original columns and adds two derived fields:
+Every record in this extract has a written narrative. The submission channel and consent fields have the same value in all records, so they are not useful for comparing groups.
 
-| Column Name | Description | Data Type | Missing | Project Role |
-| :--- | :--- | :--- | :---: | :--- |
-| `reported_relief` | Binary relief outcome (1 = monetary/non-monetary relief, 0 = explanation, missing = untimely response) | Nullable integer (`Int64`) | 0.61% | Target variable for supervised outcome modeling |
-| `narrative_group_id` | SHA-256 hash of normalized narrative text (whitespace collapsed, lowercased) | Text | 0.00% | Grouping key to prevent duplicate texts crossing train/test splits |
+## Fields added during cleaning
 
-## Processed Text Dataset Fields
+The file data/processed/complaints_clean.csv.gz contains 19 columns. It drops consumer_disputed because every value is missing, then adds:
 
-The processed text dataset (`data/processed/complaints_text.csv.gz`) provides a lightweight, tokenization-ready text representation alongside narrative quality metrics:
+| Field | Meaning |
+| --- | --- |
+| reported_relief | 1 for monetary or non-monetary relief; 0 for closed with explanation; empty for untimely response |
+| narrative_group_id | Same value for narratives that match after lowercasing and whitespace normalization |
 
-| Column Name | Description | Data Type | Missing | Project Role |
-| :--- | :--- | :--- | :---: | :--- |
-| `complaint_id` | Unique identifier assigned to each complaint | Integer | 0.00% | Primary key matching clean dataset |
-| `narrative_group_id` | SHA-256 hash of normalized narrative text | Text | 0.00% | Grouping key for leak-free train/test partitioning |
-| `text_nlp` | Analytical narrative copy (lowercased, masking placeholders removed, whitespace normalized) | Text | 0.00% | Baseline text representation for NLP tokenization |
-| `character_count` | Length of `text_nlp` in characters | Integer | 0.00% | Text length metric |
-| `word_count` | Token count using alphanumeric word boundary regex (`\b\w+\b`) | Integer | 0.00% | Document length metric for filtering and modeling |
-| `has_redaction` | Whether original narrative contained masking placeholders (`XXXX`) | Boolean | 0.00% | Redaction indicator |
+reported_relief describes the response category reported by the company. It is not a measure of consumer satisfaction.
 
-### Text Field Design Notes
+narrative_group_id helps keep repeated text out of both the training and test sets. It must not be used as a prediction feature.
 
-- **Analytical copy vs. original narrative:** `text_nlp` is an analytical copy intended for NLP vectorization and theme extraction. It does not replace the human-readable narrative. The original, full-text narrative remains preserved in `consumer_complaint_narrative` within `complaints_clean.csv.gz`.
-- **Masking placeholder removal:** CFPB redaction strings consisting of runs of four or more `X` characters (such as `XXXX`) were removed from `text_nlp` to avoid artificial high-frequency vocabulary tokens that do not reflect consumer language. They are preserved in the clean dataset to retain original reporting context.
-- **Word counting rule:** Word counts are computed using an alphanumeric word-boundary rule (`\b\w+\b`) applied to `text_nlp`. Empty strings yield a word count of 0.
+## Fields in the text file
 
-## Important Notes
+The file data/processed/complaints_text.csv.gz has six columns:
 
-- **Written complaints versus structured issue categories:** The `issue` field comes from a fixed dropdown list selected during submission. The `consumer_complaint_narrative` contains the customer's actual words, which provide context that dropdown categories cannot capture.
-- **Company responses do not prove customer satisfaction:** The `company_response_to_consumer` field records what the institution reported to close the complaint (such as `Closed with explanation`). It does not indicate whether the customer was satisfied with that outcome.
-- **Published narratives only:** All 117,214 records in this historical extract contain a non-empty customer narrative. Nationwide CFPB data includes many complaints without written text; this specific extract focuses on complaints where consumers opted into public sharing.
-- **Fields with no usable information:** The `consumer_disputed` field is completely empty because the CFPB stopped collecting dispute data in early 2017. Columns like `submitted_via` and `consumer_consent_provided` have only one value across the entire file.
+| Field | Meaning |
+| --- | --- |
+| complaint_id | Complaint number used to match the cleaned file |
+| narrative_group_id | Group for repeated narratives |
+| text_nlp | Lowercased narrative with repeated spaces and masking markers removed |
+| character_count | Number of characters in text_nlp |
+| word_count | Number of word-like tokens in text_nlp |
+| has_redaction | Whether the original text contained an XXXX-style masking marker |
+
+text_nlp is a copy made for analysis. The original narrative is still in complaints_clean.csv.gz.
+
+Both processed files are created locally and are not committed to GitHub.

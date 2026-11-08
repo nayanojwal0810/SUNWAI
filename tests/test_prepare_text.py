@@ -11,7 +11,6 @@ from src.nlp.prepare_text import (
     count_words,
     detect_redaction,
     export_text_dataset,
-    format_text_profile_report,
     load_text_dataset,
     normalize_text,
     prepare_text_dataset,
@@ -323,89 +322,3 @@ def test_repeated_narrative_stats() -> None:
     assert stats["repeated_records_percentage"] == round(100.0 * 5 / 7, 2)
     assert stats["largest_group_size"] == 3
 
-
-def test_dynamic_report_values_change_with_synthetic_statistics() -> None:
-    stats_a = {
-        "total_complaints": 1000,
-        "nonempty_narratives": 990,
-        "empty_narratives": 10,
-        "median_char_count": 250.0,
-        "median_word_count": 50.0,
-        "p10_word_count": 10.0,
-        "p90_word_count": 100.0,
-        "redacted_count": 600,
-        "redacted_percentage": 60.0,
-        "short_text_count": 150,
-        "short_text_percentage": 15.0,
-    }
-    rep_a = {
-        "distinct_groups": 800,
-        "repeated_groups": 50,
-        "records_in_repeated_groups": 100,
-        "repeated_records_percentage": 10.0,
-        "largest_group_size": 25,
-    }
-    prod_a = pd.DataFrame(
-        {
-            "product": ["Product X", "Product Y"],
-            "complaint_count": [600, 400],
-            "median_word_count": [40.0, 70.0],
-            "redaction_percentage": [55.0, 65.0],
-            "repeated_group_percentage": [8.0, 12.0],
-        }
-    )
-
-    report_a = format_text_profile_report(stats_a, rep_a, prod_a)
-
-    assert "50 words" in report_a
-    assert "10 words" in report_a
-    assert "100 words" in report_a
-    assert "15.00%" in report_a
-    assert "10.00%" in report_a
-    assert "93.75%" in report_a
-    assert "60.00%" in report_a
-
-    stats_b = {
-        "total_complaints": 5000,
-        "nonempty_narratives": 4995,
-        "empty_narratives": 5,
-        "median_char_count": 600.0,
-        "median_word_count": 125.0,
-        "p10_word_count": 35.0,
-        "p90_word_count": 410.0,
-        "redacted_count": 3500,
-        "redacted_percentage": 70.0,
-        "short_text_count": 200,
-        "short_text_percentage": 4.0,
-    }
-    rep_b = {
-        "distinct_groups": 4000,
-        "repeated_groups": 400,
-        "records_in_repeated_groups": 1200,
-        "repeated_records_percentage": 24.0,
-        "largest_group_size": 150,
-    }
-    prod_b = pd.DataFrame(
-        {
-            "product": ["Product A", "Product B"],
-            "complaint_count": [3000, 2000],
-            "median_word_count": [90.0, 180.0],
-            "redaction_percentage": [68.0, 75.0],
-            "repeated_group_percentage": [5.0, 20.0],
-        }
-    )
-
-    report_b = format_text_profile_report(stats_b, rep_b, prod_b)
-
-    assert "125 words" in report_b
-    assert "35 words" in report_b
-    assert "410 words" in report_b
-    assert "4.00%" in report_b
-    assert "24.00%" in report_b
-    assert "90.00%" in report_b
-    assert "70.00%" in report_b
-
-    assert "While 88.9%" not in report_a
-    assert "While 88.9%" not in report_b
-    assert "credit-repair template" not in report_a
-    assert "credit-repair template" not in report_b
