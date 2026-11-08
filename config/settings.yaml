@@ -4,6 +4,7 @@ random_seed: 42
 data:
   raw_file: data/raw/complaints.csv.gz
   clean_file: data/processed/complaints_clean.csv.gz
+  text_file: data/processed/complaints_text.csv.gz
   processed_dir: data/processed
   database_file: data/processed/sunwai.sqlite3
 

@@ -4,7 +4,7 @@
 
 SUNWAI analyzes historical US Consumer Financial Protection Bureau (CFPB) complaints to understand recurring customer issues and evaluate company responses. By combining structured complaint fields with written customer narratives, the project explores patterns in complaints and examines whether narrative text provides useful insights beyond standard category codes.
 
-The project has completed initial dataset profiling, data preparation, relational database creation, SQL business analysis, and business exploratory data analysis (EDA). Using an indexed SQLite database (`data/processed/sunwai.sqlite3`), the project analyzes full-calendar-year 2019 complaint volumes, product distributions, reported relief rates, and product-aware peer company benchmarks. Statistical and robustness checks evaluate sampling uncertainty with Wilson confidence intervals, assess product outcome disparities using chi-square analysis, and audit company benchmarks across observation windows. NLP models, machine-learning classifiers, and dashboards have not yet been built.
+The project has completed initial dataset profiling, data preparation, relational database creation, SQL business analysis, business exploratory data analysis (EDA), and complaint narrative text profiling. Using an indexed SQLite database (`data/processed/sunwai.sqlite3`), the project analyzes full-calendar-year 2019 complaint volumes, product distributions, reported relief rates, and product-aware peer company benchmarks. Statistical and robustness checks evaluate sampling uncertainty with Wilson confidence intervals, assess product outcome disparities using chi-square analysis, and audit company benchmarks across observation windows. Complaint narrative processing provides an analytical text dataset and profiles narrative length, CFPB masking placeholders, and repeated template texts across all 117,214 complaints. NLP topic models, machine-learning classifiers, and dashboards have not yet been built.
 
 ## Dataset
 
@@ -81,7 +81,7 @@ The planned project workflow includes:
    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz" -OutFile "data/raw/complaints.csv.gz"
    ```
 
-5. Run dataset profiling, data preparation, database creation, SQL analysis, business EDA, and tests:
+5. Run dataset profiling, data preparation, database creation, SQL analysis, business EDA, text preparation, and tests:
 
    ```bash
    python src/data/profile_complaints.py
@@ -89,8 +89,22 @@ The planned project workflow includes:
    python -m src.data.build_database
    python -m src.analytics.run_sql_analyses
    python -m src.analytics.analyze_business
+   python -m src.nlp.prepare_text
    python -m pytest -q
    ```
+
+## Complaint Narrative Processing
+
+To prepare written customer narratives for NLP modeling, `src/nlp/prepare_text.py` produces an analytical text copy (`text_nlp`) and derives narrative quality metrics stored in `data/processed/complaints_text.csv.gz`:
+
+- **Execution:** `python -m src.nlp.prepare_text`
+- **Findings report:** [Complaint Narrative Profiling Report](reports/text_profile.md)
+- **Key aggregate findings:**
+  - **Total narratives profiled:** 117,214 complaints across the historical extract.
+  - **Median word count:** 116 words per complaint (10th percentile: 31 words; 90th percentile: 393 words). Only 5.07% of narratives contain fewer than 20 words.
+  - **Masking placeholders:** 78.14% of narratives (91,596 complaints) contain CFPB redaction markers (`XXXX`), which were stripped from `text_nlp` to avoid artificial high-frequency terms.
+  - **Repeated narratives:** 16.27% of complaints (19,069 records across 6,051 distinct text groups) belong to repeated narrative groups, concentrated heavily in credit reporting disputes (30.64%).
+- **Modeling rule:** To prevent data leakage across train/test splits, all future machine-learning partitions must be split on `narrative_group_id` rather than naive row-level random splitting. In addition, TF-IDF vectorizers and vocabulary selectors must be fitted strictly on training partitions.
 
 ## Project Files
 
@@ -101,17 +115,20 @@ The planned project workflow includes:
 - `src/data/build_database.py`: Script that initializes the SQLite database, populates dimension and fact tables, and validates data integrity.
 - `src/analytics/run_sql_analyses.py`: Script that executes the SQL analytical queries, exports CSV summaries to `outputs/sql/`, and generates the findings report.
 - `src/analytics/analyze_business.py`: Script that performs business exploratory data analysis, computes Wilson confidence intervals, conducts chi-square tests, audits company benchmarks, and creates visual charts.
+- `src/nlp/prepare_text.py`: Script that normalizes complaint text, removes masking placeholders, calculates token metrics, and exports `complaints_text.csv.gz`.
 - `docs/data_dictionary.md`: [Data Dictionary](docs/data_dictionary.md) explaining all original and prepared dataset columns.
 - `docs/database_schema.md`: [Database Schema](docs/database_schema.md) describing table structures, relationships, and constraints.
 - `reports/data_profile.md`: [Data Profile Report](reports/data_profile.md) detailing dataset quality and distributions.
 - `reports/data_preparation.md`: [Data Preparation Report](reports/data_preparation.md) detailing data cleaning changes, relief label distributions, and validation checks.
 - `reports/sql_findings.md`: [SQL Business Analysis Findings](reports/sql_findings.md) detailing monthly trends, product-level relief rates, and product-mix-adjusted company comparisons.
 - `reports/business_findings.md`: [Business Analysis Findings](reports/business_findings.md) detailing statistical uncertainty, product-level relief confidence intervals, and benchmark robustness across observation windows.
+- `reports/text_profile.md`: [Complaint Narrative Profiling Report](reports/text_profile.md) analyzing narrative length, redaction prevalence, repeated text groups, and product differences.
 - `tests/test_profile_complaints.py`: Unit tests for profiling and verification functions.
 - `tests/test_prepare_complaints.py`: Unit tests for data cleaning, relief mapping, and narrative grouping.
 - `tests/test_build_database.py`: Unit tests for database table creation, foreign key checks, and rebuilding mechanics.
 - `tests/test_sql_analyses.py`: Unit tests for SQL analytical queries, MoM calculations, and product-mix benchmarks.
 - `tests/test_business_analysis.py`: Unit tests for Wilson score intervals, chi-square contingency tests, period sensitivity, and independent benchmark calculations.
+- `tests/test_prepare_text.py`: Unit tests for text normalization, redaction detection, word counting, repeated group statistics, and schema validation.
 - `config/settings.yaml`: Project paths and configuration settings.
 - `requirements.txt`: Initial Python dependencies.
 

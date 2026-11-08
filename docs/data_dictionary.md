@@ -32,6 +32,25 @@ The prepared dataset (`data/processed/complaints_clean.csv.gz`) excludes `consum
 | `reported_relief` | Binary relief outcome (1 = monetary/non-monetary relief, 0 = explanation, missing = untimely response) | Nullable integer (`Int64`) | 0.61% | Target variable for supervised outcome modeling |
 | `narrative_group_id` | SHA-256 hash of normalized narrative text (whitespace collapsed, lowercased) | Text | 0.00% | Grouping key to prevent duplicate texts crossing train/test splits |
 
+## Processed Text Dataset Fields
+
+The processed text dataset (`data/processed/complaints_text.csv.gz`) provides a lightweight, tokenization-ready text representation alongside narrative quality metrics:
+
+| Column Name | Description | Data Type | Missing | Project Role |
+| :--- | :--- | :--- | :---: | :--- |
+| `complaint_id` | Unique identifier assigned to each complaint | Integer | 0.00% | Primary key matching clean dataset |
+| `narrative_group_id` | SHA-256 hash of normalized narrative text | Text | 0.00% | Grouping key for leak-free train/test partitioning |
+| `text_nlp` | Analytical narrative copy (lowercased, masking placeholders removed, whitespace normalized) | Text | 0.00% | Baseline text representation for NLP tokenization |
+| `character_count` | Length of `text_nlp` in characters | Integer | 0.00% | Text length metric |
+| `word_count` | Token count using alphanumeric word boundary regex (`\b\w+\b`) | Integer | 0.00% | Document length metric for filtering and modeling |
+| `has_redaction` | Whether original narrative contained masking placeholders (`XXXX`) | Boolean | 0.00% | Redaction indicator |
+
+### Text Field Design Notes
+
+- **Analytical copy vs. original narrative:** `text_nlp` is an analytical copy intended for NLP vectorization and theme extraction. It does not replace the human-readable narrative. The original, full-text narrative remains preserved in `consumer_complaint_narrative` within `complaints_clean.csv.gz`.
+- **Masking placeholder removal:** CFPB redaction strings consisting of runs of four or more `X` characters (such as `XXXX`) were removed from `text_nlp` to avoid artificial high-frequency vocabulary tokens that do not reflect consumer language. They are preserved in the clean dataset to retain original reporting context.
+- **Word counting rule:** Word counts are computed using an alphanumeric word-boundary rule (`\b\w+\b`) applied to `text_nlp`. Empty strings yield a word count of 0.
+
 ## Important Notes
 
 - **Written complaints versus structured issue categories:** The `issue` field comes from a fixed dropdown list selected during submission. The `consumer_complaint_narrative` contains the customer's actual words, which provide context that dropdown categories cannot capture.
