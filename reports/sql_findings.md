@@ -10,7 +10,7 @@
 
 ## Complaint Trends
 
-Complaint volume remained elevated through summer and early autumn 2019 before tapering in the final two months.
+In this historical extract, recorded complaints remained elevated from spring through October 2019 before declining in November and December. Because public complaint narratives involve reporting lags and snapshot cutoff dates, lower counts in the final two months reflect data collection coverage in this extract rather than a verified market-wide reduction in consumer complaints.
 
 | Month | Complaints | Previous Month | MoM Change |
 | :--- | :---: | :---: | :---: |
@@ -81,7 +81,9 @@ Reported relief varies significantly by product line. High-volume debt products 
 
 ## Product-Aware Comparison
 
-Because companies receive complaints across different product mixes, comparing raw relief rates can be misleading. The product-aware benchmark compares each company's observed relief rate to an expected rate calculated from peer-company rates across the exact products handled by that company (excluding the firm's own records from peer reference rates). The comparison includes firms with at least 200 eligible complaints in 2019.
+Because companies receive complaints across different product mixes, comparing raw relief rates can be misleading. The product-aware benchmark calculates an expected relief rate for each company based on peer-company rates within the specific products handled by that firm. For each company-product pair, peer reference rates exclude that company's own records so that individual firms do not influence their own benchmark. Because companies operate across distinct sets of products, different companies may have different reference groups.
+
+The comparison includes firms with at least 200 eligible complaints in 2019 where peer references are available across all products handled by the company. Observed differences highlight variations warranting further investigation rather than conclusive proof of service quality, and they should not be interpreted as causal outcomes.
 
 ### Top Positive Rate Differences (Observed Above Product-Mix Expectation)
 
@@ -105,11 +107,11 @@ Because companies receive complaints across different product mixes, comparing r
 
 ## Key Findings
 
-1. **Concentration in credit reporting:** Credit reporting accounts for 47.29% of all 2019 complaints (55,175 records). Three nationwide bureaus account for 37.52% of all complaints received in 2019.
-2. **Product-level relief disparity:** Reported relief rates differ fourfold across product categories, ranging from 6.43% for Mortgages up to 28.36% for Checking or Savings accounts and 28.16% for Credit Cards.
-3. **Credit bureau benchmark divergence:** Experian reported relief in 43.70% of eligible cases (+29.56 percentage points above its 14.14% product expectation), whereas TransUnion reported relief in only 4.27% of cases (-23.38 percentage points below its 27.64% expectation) despite similar volumes and product profiles.
-4. **High operational timeliness:** Across all products, 98.22% of complaints received a timely response, ranging from 92.77% in Payday loans to 99.34% in Credit cards.
-5. **High outcome label coverage:** 99.39% of 2019 complaints have definitive resolution outcome labels, with only 718 untimely responses requiring exclusion from relief rate denominators.
+1. **Concentration in top product category:** Credit reporting, credit repair services, or other personal consumer reports accounts for 47.29% of all 2019 complaints (55,175 records). The top three companies by volume account for 37.52% of all complaints received in 2019.
+2. **Product-level relief disparity:** Reported relief rates differ across product categories, ranging from 6.43% for Mortgage up to 28.36% for Checking or savings account.
+3. **Product-mix benchmark differences:** Among qualifying companies (at least 200 eligible complaints), product-adjusted rate differences ranged from -23.38 percentage points (TRANSUNION INTERMEDIATE HOLDINGS, INC.: 4.27% observed vs. 27.64% expected) to +29.56 percentage points (Experian Information Solutions Inc.: 43.70% observed vs. 14.14% expected). These differences reflect comparisons against product peers rather than uniform institutional service quality.
+4. **High operational timeliness:** Across all products, 98.22% of complaints received a timely response, ranging from 92.77% in Payday loan, title loan, or personal loan to 99.34% in Credit card or prepaid card.
+5. **High outcome label coverage:** 99.38% of 2019 complaints have definitive resolution outcome labels, with only 718 untimely responses requiring exclusion from relief rate denominators.
 
 ## Limitations
 

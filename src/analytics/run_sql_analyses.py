@@ -132,24 +132,7 @@ def format_sql_findings_report(results: dict[str, pd.DataFrame]) -> str:
     total_relief = int(relief["relief_complaints"].sum())
     total_unlabeled = int(relief["unlabeled_complaints"].sum())
     overall_relief_pct = round(100.0 * total_relief / total_eligible, 2) if total_eligible > 0 else 0.0
-
-    # Key bureau benchmarks
-    bureau_names = [
-        "Experian Information Solutions Inc.",
-        "TRANSUNION INTERMEDIATE HOLDINGS, INC.",
-        "EQUIFAX, INC.",
-    ]
-    bureau_rows = benchmark[benchmark["company_name"].isin(bureau_names)]
-    experian_diff = bureau_rows[bureau_rows["company_name"].str.contains("Experian", case=False)]
-    transunion_diff = bureau_rows[bureau_rows["company_name"].str.contains("TRANSUNION", case=False)]
-
-    exp_obs = float(experian_diff["observed_relief_percentage"].iloc[0]) if not experian_diff.empty else 0.0
-    exp_exp = float(experian_diff["expected_relief_percentage"].iloc[0]) if not experian_diff.empty else 0.0
-    exp_diff = float(experian_diff["diff_percentage_points"].iloc[0]) if not experian_diff.empty else 0.0
-
-    tu_obs = float(transunion_diff["observed_relief_percentage"].iloc[0]) if not transunion_diff.empty else 0.0
-    tu_exp = float(transunion_diff["expected_relief_percentage"].iloc[0]) if not transunion_diff.empty else 0.0
-    tu_diff = float(transunion_diff["diff_percentage_points"].iloc[0]) if not transunion_diff.empty else 0.0
+    label_coverage_pct = round(100.0 * total_eligible / total_2019, 2) if total_2019 > 0 else 0.0
 
     lines = [
         "# SQL Business Analysis Findings",
@@ -158,13 +141,13 @@ def format_sql_findings_report(results: dict[str, pd.DataFrame]) -> str:
         "",
         "- **Reporting window:** Calendar year 2019 (January 1, 2019 through December 31, 2019).",
         f"- **Qualifying 2019 complaints:** {total_2019:,} records.",
-        f"- **Eligible labeled complaints:** {total_eligible:,} records ({round(100.0 * total_eligible / total_2019, 2):.2f}% outcome coverage).",
+        f"- **Eligible labeled complaints:** {total_eligible:,} records ({label_coverage_pct:.2f}% outcome coverage).",
         f"- **Unlabeled complaints:** {total_unlabeled:,} records (untimely responses excluded from relief rate denominators).",
         f"- **Overall 2019 relief rate:** {overall_relief_pct:.2f}% of eligible complaints received reported relief.",
         "",
         "## Complaint Trends",
         "",
-        "Complaint volume remained elevated through summer and early autumn 2019 before tapering in the final two months.",
+        "In this historical extract, recorded complaints remained elevated from spring through October 2019 before declining in November and December. Because public complaint narratives involve reporting lags and snapshot cutoff dates, lower counts in the final two months reflect data collection coverage in this extract rather than a verified market-wide reduction in consumer complaints.",
         "",
         "| Month | Complaints | Previous Month | MoM Change |",
         "| :--- | :---: | :---: | :---: |",
@@ -232,9 +215,14 @@ def format_sql_findings_report(results: dict[str, pd.DataFrame]) -> str:
             "## Product-Aware Comparison",
             "",
             "Because companies receive complaints across different product mixes, comparing raw relief rates can be misleading. "
-            "The product-aware benchmark compares each company's observed relief rate to an expected rate calculated from peer-company "
-            "rates across the exact products handled by that company (excluding the firm's own records from peer reference rates). "
-            "The comparison includes firms with at least 200 eligible complaints in 2019.",
+            "The product-aware benchmark calculates an expected relief rate for each company based on peer-company rates within the "
+            "specific products handled by that firm. For each company-product pair, peer reference rates exclude that company's own "
+            "records so that individual firms do not influence their own benchmark. Because companies operate across distinct sets "
+            "of products, different companies may have different reference groups.",
+            "",
+            "The comparison includes firms with at least 200 eligible complaints in 2019 where peer references are available across "
+            "all products handled by the company. Observed differences highlight variations warranting further investigation rather "
+            "than conclusive proof of service quality, and they should not be interpreted as causal outcomes.",
             "",
             "### Top Positive Rate Differences (Observed Above Product-Mix Expectation)",
             "",
@@ -243,12 +231,15 @@ def format_sql_findings_report(results: dict[str, pd.DataFrame]) -> str:
         ]
     )
 
-    for _, row in benchmark.head(5).iterrows():
-        lines.append(
-            f"| {row['company_name']} | {int(row['eligible_complaints']):,} | "
-            f"{row['observed_relief_percentage']:.2f}% | {row['expected_relief_percentage']:.2f}% | "
-            f"{row['diff_percentage_points']:+.2f} |"
-        )
+    if benchmark.empty:
+        lines.append("| — | — | — | — | — |")
+    else:
+        for _, row in benchmark.head(5).iterrows():
+            lines.append(
+                f"| {row['company_name']} | {int(row['eligible_complaints']):,} | "
+                f"{row['observed_relief_percentage']:.2f}% | {row['expected_relief_percentage']:.2f}% | "
+                f"{row['diff_percentage_points']:+.2f} |"
+            )
 
     lines.extend(
         [
@@ -260,23 +251,121 @@ def format_sql_findings_report(results: dict[str, pd.DataFrame]) -> str:
         ]
     )
 
-    for _, row in benchmark.tail(5).iterrows():
-        lines.append(
-            f"| {row['company_name']} | {int(row['eligible_complaints']):,} | "
-            f"{row['observed_relief_percentage']:.2f}% | {row['expected_relief_percentage']:.2f}% | "
-            f"{row['diff_percentage_points']:+.2f} |"
+    if benchmark.empty:
+        lines.append("| — | — | — | — | — |")
+    else:
+        for _, row in benchmark.tail(5).iterrows():
+            lines.append(
+                f"| {row['company_name']} | {int(row['eligible_complaints']):,} | "
+                f"{row['observed_relief_percentage']:.2f}% | {row['expected_relief_percentage']:.2f}% | "
+                f"{row['diff_percentage_points']:+.2f} |"
+            )
+
+    # Dynamic calculation of key findings
+    if not products.empty:
+        top_prod = products.iloc[0]
+        top_prod_name = top_prod["product_name"]
+        top_prod_share = float(top_prod["percentage"])
+        top_prod_count = int(top_prod["complaint_count"])
+    else:
+        top_prod_name = "N/A"
+        top_prod_share = 0.0
+        top_prod_count = 0
+
+    if not companies.empty:
+        top_n = min(3, len(companies))
+        top_share = float(companies.head(top_n)["percentage_of_all_complaints"].sum())
+        num_words = {1: "single", 2: "top two", 3: "top three"}
+        prefix = num_words.get(top_n, f"top {top_n}")
+        top_companies_text = f"The {prefix} companies by volume account for {top_share:.2f}% of all complaints received in 2019."
+    else:
+        top_companies_text = "Company concentration data is unavailable."
+
+    finding_1 = (
+        f"1. **Concentration in top product category:** {top_prod_name} accounts for {top_prod_share:.2f}% "
+        f"of all 2019 complaints ({top_prod_count:,} records). {top_companies_text}"
+    )
+
+    valid_relief = relief[relief["eligible_complaints"] > 0]
+    if not valid_relief.empty:
+        max_relief_row = valid_relief.loc[valid_relief["relief_percentage"].idxmax()]
+        min_relief_row = valid_relief.loc[valid_relief["relief_percentage"].idxmin()]
+        max_relief_prod = max_relief_row["product_name"]
+        max_relief_pct = float(max_relief_row["relief_percentage"])
+        min_relief_prod = min_relief_row["product_name"]
+        min_relief_pct = float(min_relief_row["relief_percentage"])
+        finding_2 = (
+            f"2. **Product-level relief disparity:** Reported relief rates differ across product categories, "
+            f"ranging from {min_relief_pct:.2f}% for {min_relief_prod} up to {max_relief_pct:.2f}% for {max_relief_prod}."
         )
+    else:
+        finding_2 = "2. **Product-level relief disparity:** Product-level relief data is unavailable."
+
+    if len(benchmark) >= 2:
+        top_pos = benchmark.iloc[0]
+        top_neg = benchmark.iloc[-1]
+        finding_3 = (
+            f"3. **Product-mix benchmark differences:** Among qualifying companies (at least 200 eligible complaints), "
+            f"product-adjusted rate differences ranged from {float(top_neg['diff_percentage_points']):+.2f} percentage points "
+            f"({top_neg['company_name']}: {float(top_neg['observed_relief_percentage']):.2f}% observed vs. "
+            f"{float(top_neg['expected_relief_percentage']):.2f}% expected) to "
+            f"{float(top_pos['diff_percentage_points']):+.2f} percentage points "
+            f"({top_pos['company_name']}: {float(top_pos['observed_relief_percentage']):.2f}% observed vs. "
+            f"{float(top_pos['expected_relief_percentage']):.2f}% expected). "
+            f"These differences reflect comparisons against product peers rather than uniform institutional service quality."
+        )
+    elif len(benchmark) == 1:
+        single = benchmark.iloc[0]
+        finding_3 = (
+            f"3. **Product-mix benchmark differences:** Only one company met the qualification threshold "
+            f"({single['company_name']}: {float(single['observed_relief_percentage']):.2f}% observed vs. "
+            f"{float(single['expected_relief_percentage']):.2f}% expected, difference of "
+            f"{float(single['diff_percentage_points']):+.2f} percentage points)."
+        )
+    else:
+        finding_3 = (
+            "3. **Product-mix benchmark differences:** Benchmark comparison is unavailable because no companies "
+            "met the qualification threshold of 200 eligible complaints with complete peer references."
+        )
+
+    total_timely_complaints = int(timely["total_complaints"].sum())
+    overall_timely_pct = (
+        round(100.0 * timely["timely_count"].sum() / total_timely_complaints, 2)
+        if total_timely_complaints > 0
+        else 0.0
+    )
+    valid_timely = timely[timely["total_complaints"] > 0]
+    if not valid_timely.empty:
+        max_timely_row = valid_timely.loc[valid_timely["timely_percentage"].idxmax()]
+        min_timely_row = valid_timely.loc[valid_timely["timely_percentage"].idxmin()]
+        max_timely_prod = max_timely_row["product_name"]
+        max_timely_pct = float(max_timely_row["timely_percentage"])
+        min_timely_prod = min_timely_row["product_name"]
+        min_timely_pct = float(min_timely_row["timely_percentage"])
+        finding_4 = (
+            f"4. **High operational timeliness:** Across all products, {overall_timely_pct:.2f}% of complaints "
+            f"received a timely response, ranging from {min_timely_pct:.2f}% in {min_timely_prod} "
+            f"to {max_timely_pct:.2f}% in {max_timely_prod}."
+        )
+    else:
+        finding_4 = f"4. **High operational timeliness:** Across all products, {overall_timely_pct:.2f}% of complaints received a timely response."
+
+    finding_5 = (
+        f"5. **High outcome label coverage:** {label_coverage_pct:.2f}% of 2019 complaints have definitive "
+        f"resolution outcome labels, with only {total_unlabeled:,} untimely responses requiring exclusion "
+        f"from relief rate denominators."
+    )
 
     lines.extend(
         [
             "",
             "## Key Findings",
             "",
-            f"1. **Concentration in credit reporting:** Credit reporting accounts for {products.iloc[0]['percentage']:.2f}% of all 2019 complaints ({int(products.iloc[0]['complaint_count']):,} records). Three nationwide bureaus account for 37.52% of all complaints received in 2019.",
-            "2. **Product-level relief disparity:** Reported relief rates differ fourfold across product categories, ranging from 6.43% for Mortgages up to 28.36% for Checking or Savings accounts and 28.16% for Credit Cards.",
-            f"3. **Credit bureau benchmark divergence:** Experian reported relief in {exp_obs:.2f}% of eligible cases ({exp_diff:+.2f} percentage points above its {exp_exp:.2f}% product expectation), whereas TransUnion reported relief in only {tu_obs:.2f}% of cases ({tu_diff:+.2f} percentage points below its {tu_exp:.2f}% expectation) despite similar volumes and product profiles.",
-            f"4. **High operational timeliness:** Across all products, {timely['timely_count'].sum() / timely['total_complaints'].sum() * 100:.2f}% of complaints received a timely response, ranging from 92.77% in Payday loans to 99.34% in Credit cards.",
-            f"5. **High outcome label coverage:** 99.39% of 2019 complaints have definitive resolution outcome labels, with only {total_unlabeled:,} untimely responses requiring exclusion from relief rate denominators.",
+            finding_1,
+            finding_2,
+            finding_3,
+            finding_4,
+            finding_5,
             "",
             "## Limitations",
             "",

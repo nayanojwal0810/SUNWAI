@@ -48,12 +48,11 @@ company_aggregates AS (
         COUNT(DISTINCT cpb.product_id) AS products_represented,
         SUM(cpb.cp_eligible) AS eligible_complaints,
         SUM(cpb.cp_relief) AS observed_relief_count,
-        SUM(cpb.cp_eligible * cpb.peer_relief_rate) AS expected_relief_count,
-        MIN(cpb.peer_relief_rate) AS min_peer_rate
+        SUM(cpb.cp_eligible * cpb.peer_relief_rate) AS expected_relief_count
     FROM company_product_benchmarks cpb
     GROUP BY cpb.company_id
     HAVING eligible_complaints >= 200
-       AND min_peer_rate IS NOT NULL
+       AND COUNT(CASE WHEN cpb.peer_relief_rate IS NULL THEN 1 END) = 0
 )
 SELECT
     c.company_name,
