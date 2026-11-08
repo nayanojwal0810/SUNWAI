@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing and coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and local environment files
+.env
+*.env
+.streamlit/secrets.toml
+
+# Data directories
+data/raw/
+data/processed/
+
+# Outputs, artifacts, and local reports
+outputs/
+artifacts/
+
+# Database files
+*.sqlite3
+*.db
+*.sqlite
+
+# Machine learning model artifacts
+*.pkl
+*.joblib
+*.onnx
+
+# Parquet files
+*.parquet
+
+# Jupyter / IPython checkpoints
+.ipynb_checkpoints/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Private blueprints and planning notes
+SUNWAI_End_to_End_Implementation_Blueprint.txt
+

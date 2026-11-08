@@ -1,0 +1,15 @@
+project_name: SUNWAI
+random_seed: 42
+
+data:
+  raw_file: data/raw/complaints.csv.gz
+  processed_dir: data/processed
+  database_file: data/processed/sunwai.sqlite3
+
+paths:
+  outputs_dir: outputs
+  artifacts_dir: artifacts
+
+source:
+  expected_sha256: f4a5e174d364f1e1a25fac324e1a8224ff4e9454326e6e58abaa194bca93097b
+
