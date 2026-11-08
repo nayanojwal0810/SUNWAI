@@ -32,7 +32,19 @@ The planned end-to-end analytics workflow will encompass:
 
 ## Current Project Status
 
-This repository contains only the initial project foundation, configuration, and environment setup. No data ingestion pipelines, analytical models, database tables, or dashboards have been executed or built yet.
+The initial project foundation and raw dataset profiling have been completed. The raw dataset integrity has been verified, all 18 fields are documented in the data dictionary, and an initial dataset profile report has been generated. No data cleaning pipelines, feature engineering, database tables, analytical models, or dashboards have been built yet.
+
+## Data Profiling
+
+To verify the raw dataset integrity and generate the technical profiling report, run:
+
+```bash
+python src/data/profile_complaints.py
+```
+
+Detailed documentation and generated profiling outputs:
+- [Data Dictionary](docs/data_dictionary.md): Field definitions, data types, missing rates, and planned project roles.
+- [Data Profiling Report](reports/data_profile.md): Detailed structural metrics, narrative coverage, category distributions, and data-quality findings.
 
 ## Data Limitations
 
