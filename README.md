@@ -1,4 +1,4 @@
-# SUNWAI
+# SUNWAI — Financial Consumer Complaint Intelligence & Decision-Support Analytics
 
 SUNWAI examines written consumer complaints about financial services. The project uses Python and SQL to find common problems, compare reported company responses, and study the complaint text.
 
