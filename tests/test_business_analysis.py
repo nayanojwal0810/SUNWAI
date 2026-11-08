@@ -7,10 +7,12 @@ import pandas as pd
 import pytest
 
 from src.analytics.analyze_business import (
+    audit_company_benchmark,
     calculate_wilson_interval,
     compute_company_benchmark,
     compute_product_period_sensitivity,
     compute_product_relief_intervals,
+    format_business_findings_report,
     perform_chi_square_test,
 )
 
@@ -291,3 +293,273 @@ def test_period_sensitivity_date_filtering(memory_db: sqlite3.Connection) -> Non
     # Difference: 50.0 - 100.0 = -50.0 pp
     assert row["diff_percentage_points"] == -50.0
     assert row["abs_diff_pp"] == 50.0
+
+
+def test_format_business_findings_report_dynamic_statements() -> None:
+    def create_mock_results(
+        min_width: float,
+        max_width: float,
+        min_rate: float,
+        max_rate: float,
+        period_shift: float,
+        strict_retention_count: int,
+        comp_shift: float,
+    ) -> dict:
+        ci_df = pd.DataFrame([
+            {
+                "product_name": "Product Alpha",
+                "eligible_complaints": 1000,
+                "relief_complaints": int(1000 * min_rate / 100.0),
+                "relief_percentage": min_rate,
+                "ci_lower": min_rate - min_width / 2,
+                "ci_upper": min_rate + min_width / 2,
+                "ci_width": min_width,
+            },
+            {
+                "product_name": "Product Beta",
+                "eligible_complaints": 500,
+                "relief_complaints": int(500 * max_rate / 100.0),
+                "relief_percentage": max_rate,
+                "ci_lower": max_rate - max_width / 2,
+                "ci_upper": max_rate + max_width / 2,
+                "ci_width": max_width,
+            },
+        ])
+        chi2 = {
+            "chi2_stat": 123.4567,
+            "dof": 1,
+            "p_value": 0.00001,
+            "p_value_formatted": "< 0.0001",
+            "total_observations": 1500,
+            "cramers_v": 0.2869,
+        }
+        period_df = pd.DataFrame([
+            {
+                "product_name": "Product Alpha",
+                "eligible_complaints_full_year": 1000,
+                "relief_percentage_full_year": min_rate,
+                "eligible_complaints_jan_oct": 900,
+                "relief_percentage_jan_oct": min_rate - period_shift,
+                "diff_percentage_points": period_shift,
+                "abs_diff_pp": abs(period_shift),
+            }
+        ])
+        audit = {
+            "sql_count": 10,
+            "py_baseline_count": 10,
+            "py_strict_count": strict_retention_count,
+            "py_janoct_strict_count": 8,
+            "max_rate_discrepancy": 0.0000,
+            "top3_comparison": [
+                {
+                    "company_name": "Corp One",
+                    "eligible_complaints_fy": 500,
+                    "full_year_diff_pp": 10.0,
+                    "jan_oct_diff_pp": 10.0 + comp_shift,
+                    "shift_pp": comp_shift,
+                    "qualifies_both": True,
+                }
+            ],
+        }
+        return {
+            "product_relief_ci": ci_df,
+            "chi_square": chi2,
+            "product_period_sensitivity": period_df,
+            "benchmark_audit": audit,
+        }
+
+    # Case 1: First set of parameters
+    res1 = create_mock_results(
+        min_width=1.25,
+        max_width=3.75,
+        min_rate=8.50,
+        max_rate=32.40,
+        period_shift=0.85,
+        strict_retention_count=8,  # 8 / 10 = 80.0%
+        comp_shift=0.45,
+    )
+    rep1 = format_business_findings_report(res1)
+    assert "1.25 percentage points" in rep1
+    assert "3.75 percentage points" in rep1
+    assert "8.50%" in rep1
+    assert "32.40%" in rep1
+    assert "0.85 percentage points" in rep1
+    assert "80.0% retention" in rep1
+    assert "0.45 percentage points" in rep1
+
+    # Case 2: Changed parameters update the text dynamically
+    res2 = create_mock_results(
+        min_width=2.10,
+        max_width=5.80,
+        min_rate=12.20,
+        max_rate=45.60,
+        period_shift=1.45,
+        strict_retention_count=6,  # 6 / 10 = 60.0%
+        comp_shift=0.92,
+    )
+    rep2 = format_business_findings_report(res2)
+    assert "2.10 percentage points" in rep2
+    assert "5.80 percentage points" in rep2
+    assert "12.20%" in rep2
+    assert "45.60%" in rep2
+    assert "1.45 percentage points" in rep2
+    assert "60.0% retention" in rep2
+    assert "0.92 percentage points" in rep2
+
+    # Prior values should no longer appear in rep2
+    assert "1.25 percentage points" not in rep2
+    assert "3.75 percentage points" not in rep2
+    assert "80.0% retention" not in rep2
+
+    # Verify absence of overconfident statements
+    assert "genuine distributional variation" not in rep2.lower()
+    assert "proving the result is not an artifact" not in rep2.lower()
+
+
+def test_audit_company_benchmark_detects_rate_mismatch(memory_db: sqlite3.Connection) -> None:
+    records = []
+    cid = 1
+    # Company Alpha (id 1): 200 complaints in Product 1 (40 relief=1, 160 relief=0 -> obs = 20.0%)
+    for _ in range(40):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 1, "t", "r", 1, "h"))
+        cid += 1
+    for _ in range(160):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 1, "t", "e", 0, "h"))
+        cid += 1
+
+    # Company Beta (id 2): 200 complaints in Product 1 (100 relief=1, 100 relief=0 -> peer rate for Alpha = 50.0%)
+    # Alpha expected = 50.0%, observed = 20.0%, diff = -30.0%
+    for _ in range(100):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 2, "t", "r", 1, "h"))
+        cid += 1
+    for _ in range(100):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 2, "t", "e", 0, "h"))
+        cid += 1
+
+    memory_db.executemany(
+        """
+        INSERT INTO fact_complaints (
+            complaint_id, date_received, date_sent_to_company, product_id, company_id,
+            consumer_complaint_narrative, company_response_to_consumer, reported_relief, narrative_group_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """,
+        records,
+    )
+    memory_db.commit()
+
+    # Fake SQL benchmark with matching adjusted gap (-30.0 pp) but DIFFERENT observed and expected rates!
+    # Real Python: obs=20.0, exp=50.0, diff=-30.0
+    # Fake SQL:    obs=30.0, exp=60.0, diff=-30.0
+    fake_sql_df = pd.DataFrame([
+        {
+            "company_name": "Company Alpha",
+            "eligible_complaints": 200,
+            "products_represented": 1,
+            "observed_relief_percentage": 30.0,  # mismatch: 30 vs 20
+            "expected_relief_percentage": 60.0,  # mismatch: 60 vs 50
+            "diff_percentage_points": -30.0,     # matches!
+        },
+        {
+            "company_name": "Company Beta",
+            "eligible_complaints": 200,
+            "products_represented": 1,
+            "observed_relief_percentage": 50.0,
+            "expected_relief_percentage": 20.0,
+            "diff_percentage_points": 30.0,
+        },
+    ])
+
+    with pytest.raises(ValueError, match="exceeds 0.02 pp threshold"):
+        audit_company_benchmark(memory_db, fake_sql_df)
+
+
+def test_audit_company_benchmark_detects_company_set_mismatch(memory_db: sqlite3.Connection) -> None:
+    records = []
+    cid = 1
+    # Company Alpha (200 records in Product 1)
+    for _ in range(200):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 1, "t", "e", 0, "h"))
+        cid += 1
+    # Company Beta (200 records in Product 1)
+    for _ in range(200):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 2, "t", "e", 0, "h"))
+        cid += 1
+
+    memory_db.executemany(
+        """
+        INSERT INTO fact_complaints (
+            complaint_id, date_received, date_sent_to_company, product_id, company_id,
+            consumer_complaint_narrative, company_response_to_consumer, reported_relief, narrative_group_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """,
+        records,
+    )
+    memory_db.commit()
+
+    # Fake SQL with different company name
+    fake_sql_df = pd.DataFrame([
+        {
+            "company_name": "Company Alpha",
+            "eligible_complaints": 200,
+            "products_represented": 1,
+            "observed_relief_percentage": 0.0,
+            "expected_relief_percentage": 0.0,
+            "diff_percentage_points": 0.0,
+        },
+        {
+            "company_name": "Company Different",
+            "eligible_complaints": 200,
+            "products_represented": 1,
+            "observed_relief_percentage": 0.0,
+            "expected_relief_percentage": 0.0,
+            "diff_percentage_points": 0.0,
+        },
+    ])
+
+    with pytest.raises(ValueError, match="Company set mismatch"):
+        audit_company_benchmark(memory_db, fake_sql_df)
+
+
+def test_audit_company_benchmark_detects_eligible_complaints_mismatch(memory_db: sqlite3.Connection) -> None:
+    records = []
+    cid = 1
+    for _ in range(200):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 1, "t", "e", 0, "h"))
+        cid += 1
+    for _ in range(200):
+        records.append((cid, "2019-05-01", "2019-05-01", 1, 2, "t", "e", 0, "h"))
+        cid += 1
+
+    memory_db.executemany(
+        """
+        INSERT INTO fact_complaints (
+            complaint_id, date_received, date_sent_to_company, product_id, company_id,
+            consumer_complaint_narrative, company_response_to_consumer, reported_relief, narrative_group_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """,
+        records,
+    )
+    memory_db.commit()
+
+    fake_sql_df = pd.DataFrame([
+        {
+            "company_name": "Company Alpha",
+            "eligible_complaints": 205,  # Real is 200
+            "products_represented": 1,
+            "observed_relief_percentage": 0.0,
+            "expected_relief_percentage": 0.0,
+            "diff_percentage_points": 0.0,
+        },
+        {
+            "company_name": "Company Beta",
+            "eligible_complaints": 200,
+            "products_represented": 1,
+            "observed_relief_percentage": 0.0,
+            "expected_relief_percentage": 0.0,
+            "diff_percentage_points": 0.0,
+        },
+    ])
+
+    with pytest.raises(ValueError, match="Eligible complaint count mismatch"):
+        audit_company_benchmark(memory_db, fake_sql_df)
+

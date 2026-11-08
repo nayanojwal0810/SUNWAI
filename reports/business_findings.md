@@ -24,11 +24,11 @@ Reported-relief rates vary significantly by product category. High-volume lendin
 | Money transfer, virtual currency, or money service | 2,548 | 435 | 17.07% | [15.66%, 18.58%] | 2.92 pp |
 | Payday loan, title loan, or personal loan | 2,174 | 193 | 8.88% | [7.75%, 10.15%] | 2.40 pp |
 
-Confidence intervals are narrow across all product categories (interval widths between 0.68 and 2.92 percentage points), indicating that estimated rates are statistically precise given the large volume of observations.
+Estimated 95% Wilson confidence interval widths range from 0.68 percentage points (Credit reporting, credit repair services, or other personal consumer reports) to 2.92 percentage points (Money transfer, virtual currency, or money service). These intervals describe binomial sampling uncertainty under simplifying assumptions. Factors such as repeated narratives and selection into the published-narrative dataset may reduce the reliability of population-level uncertainty claims.
 
 ## Statistical Evidence
 
-A chi-square test of independence was conducted on the 9 × 2 contingency table of financial products versus complaint resolution outcomes (reported relief versus closed with explanation):
+A chi-square test of independence was conducted on the contingency table of financial products versus complaint resolution outcomes (reported relief versus closed with explanation):
 
 - **Chi-square statistic (χ²):** 3,595.8545
 - **Degrees of freedom:** 8
@@ -38,7 +38,7 @@ A chi-square test of independence was conducted on the 9 × 2 contingency table 
 
 ### Interpretation
 
-The very small p-value (p < 0.0001) confirms that reported relief is not distributed uniformly across product lines. The Cramér's V of 0.1761 indicates a moderate association between product category and reported relief. In large observational datasets, high statistical power can detect even slight distribution differences; however, here the observed rate disparity is also practically substantial, ranging from 6.43% for Mortgages to 28.36% for Checking or savings accounts.
+Under the test assumptions, the small p-value (< 0.0001) indicates an association where reported relief is not distributed uniformly across product categories. The chi-square test identifies an association under these assumptions, not causation. The Cramér's V of 0.1761 describes the strength of this observational association without proving practical business significance. Within this extract, observed product relief rates range from 6.43% for Mortgage to 28.36% for Checking or savings account.
 
 ### Reporting-Period Sensitivity
 
@@ -56,7 +56,7 @@ To evaluate whether the observed decline in complaint volume during late 2019 af
 | Vehicle loan or lease | 2,681 | 10.67% | 2,471 | 10.72% | -0.05 |
 | Student loan | 3,881 | 9.20% | 3,682 | 9.15% | +0.05 |
 
-The largest rate shift observed across all products was 0.25 percentage points (Debt collection: 11.51% full year vs. 11.76% Jan–Oct). All product relief rates remained stable within 0.25 percentage points, demonstrating that product patterns are robust to late-year collection lags.
+The largest rate shift observed across all products was 0.25 percentage points (Debt collection: 11.51% full year vs. 11.76% Jan–Oct). Across all evaluated product categories, reported-relief rates shifted by at most 0.25 percentage points between the full year and the 10-month window. Small rate changes across reporting periods show stability within these two observation windows, but do not prove that reporting lags have no effect on broader complaint counts.
 
 ## Company Benchmark Robustness
 
@@ -65,8 +65,8 @@ SUNWAI's product-aware benchmark compares each company's observed relief rate to
 ### Benchmark Audit Results
 
 - **Original SQL benchmark:** 61 qualifying companies (minimum 200 eligible complaints and at least 1 peer per product).
-- **Independent Python replication:** 61 companies matched, with maximum rate discrepancy of 0.0000 percentage points (within the 0.02 pp rounding threshold).
-- **Stricter peer support (≥ 20 peers per product):** 61 of 61 companies retained (100% retention). All qualifying companies operate in products with substantial peer representation.
+- **Independent Python replication:** 61 companies matched exactly across eligible complaint counts and rate metrics, with a maximum rate discrepancy of 0.0000 percentage points (within the 0.02 pp rounding threshold).
+- **Stricter peer support (≥ 20 peers per product):** 61 of 61 companies retained (100.0% retention). All qualifying companies operate in products with substantial peer representation.
 - **January–October window (≥ 20 peers):** 55 companies qualified under the 10-month threshold.
 
 ### Period Sensitivity for Top Three Companies by Volume
@@ -77,15 +77,15 @@ SUNWAI's product-aware benchmark compares each company's observed relief rate to
 | EQUIFAX, INC. | 14,607 | +4.83 | +4.77 | -0.06 |
 | Experian Information Solutions Inc. | 14,245 | +29.56 | +29.07 | -0.49 |
 
-Adjusted rate differences for the top three nationwide bureaus shifted by less than 0.50 percentage points between the full year and the 10-month window, demonstrating strong stability.
+Product-mix adjusted rate differences for the compared high-volume companies shifted by at most 0.49 percentage points between the full year and the 10-month window.
 
 ## Key Findings
 
-1. **Precise product-level rate estimates:** 95% Wilson confidence intervals range from ±0.34 pp (Credit reporting) to ±1.46 pp (Money transfer), indicating that product-level differences reflect genuine distributional variation rather than sampling noise.
-2. **Statistically significant outcome disparity:** Chi-square testing (χ² = 3,595.8545, p < 0.0001, Cramér's V = 0.1761) confirms significant differences in company-reported relief across financial product categories.
-3. **Robustness to observation period:** Product-level relief rates shifted by at most 0.25 percentage points when excluding November and December 2019, showing that late-year reporting lags do not alter product conclusions.
-4. **Replicated and stable company benchmark:** The independent Python benchmark matched the SQL benchmark across all 61 qualifying companies, and 100% of firms remained qualified under stricter peer-support filtering.
-5. **Persistent institution-level differences:** Product-mix-adjusted differences for top-volume institutions remained consistent within 0.50 percentage points across observation windows, confirming that observed benchmark divergence is not an artifact of window selection.
+1. **Product-level interval precision:** Estimated 95% Wilson confidence interval widths range from 0.68 percentage points for Credit reporting, credit repair services, or other personal consumer reports to 2.92 percentage points for Money transfer, virtual currency, or money service, reflecting sample size precision under binomial sampling assumptions.
+2. **Product category outcome differences:** Chi-square testing (χ² = 3,595.8545, p < 0.0001, Cramér's V = 0.1761) indicates a statistically detectable association between product categories and reported resolution outcomes under test assumptions, with observed product relief rates ranging from 6.43% (Mortgage) to 28.36% (Checking or savings account).
+3. **Stability across observation periods:** Product-level relief rates shifted by at most 0.25 percentage points when comparing the full calendar year against January through October 2019 (Debt collection: -0.25 pp shift).
+4. **Replicated company benchmark:** The independent Python benchmark matched the SQL benchmark across all 61 qualifying companies (maximum rate discrepancy 0.0000 pp), with 100.0% of firms retained under stricter peer-support filtering (≥ 20 peers per product).
+5. **Institution-level sensitivity:** Product-mix-adjusted differences for the highest-volume qualifying companies shifted by at most 0.49 percentage points across the two reporting periods. These descriptive comparisons reflect relative positioning against product peers rather than verified institutional service quality.
 
 ## Limitations
 
