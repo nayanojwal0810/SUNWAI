@@ -23,6 +23,15 @@ This document explains the 18 columns in the historical Consumer Financial Prote
 | `consumer_disputed` | Historical flag for consumer dispute of outcome | Float / Boolean | 100.00% | Not usable (CFPB discontinued field in 2017) |
 | `complaint_id` | Unique identifier assigned to each complaint | Integer | 0.00% | Primary key and table joins |
 
+## Prepared Dataset Fields
+
+The prepared dataset (`data/processed/complaints_clean.csv.gz`) excludes `consumer_disputed` because the column has no values (100.00% missing). It retains all other 17 original columns and adds two derived fields:
+
+| Column Name | Description | Data Type | Missing | Project Role |
+| :--- | :--- | :--- | :---: | :--- |
+| `reported_relief` | Binary relief outcome (1 = monetary/non-monetary relief, 0 = explanation, missing = untimely response) | Nullable integer (`Int64`) | 0.61% | Target variable for supervised outcome modeling |
+| `narrative_group_id` | SHA-256 hash of normalized narrative text (whitespace collapsed, lowercased) | Text | 0.00% | Grouping key to prevent duplicate texts crossing train/test splits |
+
 ## Important Notes
 
 - **Written complaints versus structured issue categories:** The `issue` field comes from a fixed dropdown list selected during submission. The `consumer_complaint_narrative` contains the customer's actual words, which provide context that dropdown categories cannot capture.

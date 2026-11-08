@@ -4,7 +4,7 @@
 
 SUNWAI analyzes historical US Consumer Financial Protection Bureau (CFPB) complaints to understand recurring customer issues and evaluate company responses. By combining structured complaint fields with written customer narratives, the project explores patterns in complaints and examines whether narrative text provides useful insights beyond standard category codes.
 
-The project is currently in the initial setup and profiling stage. The raw dataset has been cataloged and profiled, but data cleaning, models, and dashboards have not yet been built.
+The project has completed initial dataset profiling and data preparation. The cleaned dataset (`data/processed/complaints_clean.csv.gz`) standardizes dates and identifiers, derives the binary relief outcome target (`reported_relief`), creates narrative grouping hashes (`narrative_group_id`), and removes the unpopulated dispute field. SQL analytics, NLP models, and dashboards have not yet been built.
 
 ## Dataset
 
@@ -78,19 +78,23 @@ The planned project workflow includes:
    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz" -OutFile "data/raw/complaints.csv.gz"
    ```
 
-5. Run dataset profiling and tests:
+5. Run dataset profiling, data preparation, and tests:
 
    ```bash
    python src/data/profile_complaints.py
+   python -m src.data.prepare_complaints
    python -m pytest -q
    ```
 
 ## Project Files
 
 - `src/data/profile_complaints.py`: Script that inspects the raw dataset and calculates summary statistics.
-- `docs/data_dictionary.md`: [Data Dictionary](docs/data_dictionary.md) explaining all 18 dataset columns.
+- `src/data/prepare_complaints.py`: Script that cleans data fields, maps reported relief outcomes, groups narratives, and exports the processed dataset.
+- `docs/data_dictionary.md`: [Data Dictionary](docs/data_dictionary.md) explaining all original and prepared dataset columns.
 - `reports/data_profile.md`: [Data Profile Report](reports/data_profile.md) detailing dataset quality and distributions.
+- `reports/data_preparation.md`: [Data Preparation Report](reports/data_preparation.md) detailing data cleaning changes, relief label distributions, and validation checks.
 - `tests/test_profile_complaints.py`: Unit tests for profiling and verification functions.
+- `tests/test_prepare_complaints.py`: Unit tests for data cleaning, relief mapping, and narrative grouping.
 - `config/settings.yaml`: Project paths and configuration settings.
 - `requirements.txt`: Initial Python dependencies.
 
