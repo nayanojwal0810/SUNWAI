@@ -4,7 +4,7 @@
 
 SUNWAI analyzes historical US Consumer Financial Protection Bureau (CFPB) complaints to understand recurring customer issues and evaluate company responses. By combining structured complaint fields with written customer narratives, the project explores patterns in complaints and examines whether narrative text provides useful insights beyond standard category codes.
 
-The project has completed initial dataset profiling, data preparation, relational database creation, and SQL business analysis. Using an indexed SQLite database (`data/processed/sunwai.sqlite3`), the project analyzes full-calendar-year 2019 complaint volumes, product distributions, reported relief rates, and product-aware peer company benchmarks. NLP models, machine-learning classifiers, and dashboards have not yet been built.
+The project has completed initial dataset profiling, data preparation, relational database creation, SQL business analysis, and business exploratory data analysis (EDA). Using an indexed SQLite database (`data/processed/sunwai.sqlite3`), the project analyzes full-calendar-year 2019 complaint volumes, product distributions, reported relief rates, and product-aware peer company benchmarks. Statistical and robustness checks evaluate sampling uncertainty with Wilson confidence intervals, assess product outcome disparities using chi-square analysis, and audit company benchmarks across observation windows. NLP models, machine-learning classifiers, and dashboards have not yet been built.
 
 ## Dataset
 
@@ -18,6 +18,8 @@ The project uses a historical extract from the CFPB Consumer Complaint Database 
 
 - **Python 3.11:** Core programming language.
 - **pandas:** Data manipulation and summary calculations.
+- **SciPy:** Statistical tests of independence and contingency analysis.
+- **Matplotlib:** Business charts and visualization.
 - **SQLite:** Relational database storage for structured complaints and dimension tables.
 - **PyYAML:** Configuration file loading.
 - **pytest:** Unit testing framework.
@@ -79,13 +81,14 @@ The planned project workflow includes:
    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz" -OutFile "data/raw/complaints.csv.gz"
    ```
 
-5. Run dataset profiling, data preparation, database creation, SQL analysis, and tests:
+5. Run dataset profiling, data preparation, database creation, SQL analysis, business EDA, and tests:
 
    ```bash
    python src/data/profile_complaints.py
    python -m src.data.prepare_complaints
    python -m src.data.build_database
    python -m src.analytics.run_sql_analyses
+   python -m src.analytics.analyze_business
    python -m pytest -q
    ```
 
@@ -97,15 +100,18 @@ The planned project workflow includes:
 - `src/data/prepare_complaints.py`: Script that cleans data fields, maps reported relief outcomes, groups narratives, and exports the processed dataset.
 - `src/data/build_database.py`: Script that initializes the SQLite database, populates dimension and fact tables, and validates data integrity.
 - `src/analytics/run_sql_analyses.py`: Script that executes the SQL analytical queries, exports CSV summaries to `outputs/sql/`, and generates the findings report.
+- `src/analytics/analyze_business.py`: Script that performs business exploratory data analysis, computes Wilson confidence intervals, conducts chi-square tests, audits company benchmarks, and creates visual charts.
 - `docs/data_dictionary.md`: [Data Dictionary](docs/data_dictionary.md) explaining all original and prepared dataset columns.
 - `docs/database_schema.md`: [Database Schema](docs/database_schema.md) describing table structures, relationships, and constraints.
 - `reports/data_profile.md`: [Data Profile Report](reports/data_profile.md) detailing dataset quality and distributions.
 - `reports/data_preparation.md`: [Data Preparation Report](reports/data_preparation.md) detailing data cleaning changes, relief label distributions, and validation checks.
 - `reports/sql_findings.md`: [SQL Business Analysis Findings](reports/sql_findings.md) detailing monthly trends, product-level relief rates, and product-mix-adjusted company comparisons.
+- `reports/business_findings.md`: [Business Analysis Findings](reports/business_findings.md) detailing statistical uncertainty, product-level relief confidence intervals, and benchmark robustness across observation windows.
 - `tests/test_profile_complaints.py`: Unit tests for profiling and verification functions.
 - `tests/test_prepare_complaints.py`: Unit tests for data cleaning, relief mapping, and narrative grouping.
 - `tests/test_build_database.py`: Unit tests for database table creation, foreign key checks, and rebuilding mechanics.
 - `tests/test_sql_analyses.py`: Unit tests for SQL analytical queries, MoM calculations, and product-mix benchmarks.
+- `tests/test_business_analysis.py`: Unit tests for Wilson score intervals, chi-square contingency tests, period sensitivity, and independent benchmark calculations.
 - `config/settings.yaml`: Project paths and configuration settings.
 - `requirements.txt`: Initial Python dependencies.
 

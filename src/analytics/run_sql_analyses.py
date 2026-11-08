@@ -147,7 +147,7 @@ def format_sql_findings_report(results: dict[str, pd.DataFrame]) -> str:
         "",
         "## Complaint Trends",
         "",
-        "In this historical extract, recorded complaints remained elevated from spring through October 2019 before declining in November and December. Because public complaint narratives involve reporting lags and snapshot cutoff dates, lower counts in the final two months reflect data collection coverage in this extract rather than a verified market-wide reduction in consumer complaints.",
+        "In this historical extract, recorded complaints remained elevated from spring through October 2019 before declining in November and December. Reporting lags and snapshot coverage may contribute to the observed decline, so the extract alone cannot establish a market-wide reduction in consumer complaints.",
         "",
         "| Month | Complaints | Previous Month | MoM Change |",
         "| :--- | :---: | :---: | :---: |",
