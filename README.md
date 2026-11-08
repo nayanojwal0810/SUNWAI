@@ -1,99 +1,103 @@
-# SUNWAI - Financial Consumer Complaint Intelligence & Decision-Support Analytics
+# SUNWAI — Financial Consumer Complaint Intelligence
 
-## Business Problem
+## Project Overview
 
-Financial institutions process thousands of customer disputes and service complaints across diverse products such as credit cards, mortgages, and student loans. Unresolved consumer friction increases customer churn, regulatory scrutiny, and operational overhead. Identifying recurring issues early and understanding why customers submit formal complaints is essential for effective risk mitigation and consumer protection.
+SUNWAI analyzes historical US Consumer Financial Protection Bureau (CFPB) complaints to understand recurring customer issues and evaluate company responses. By combining structured complaint fields with written customer narratives, the project explores patterns in complaints and examines whether narrative text provides useful insights beyond standard category codes.
 
-## Purpose of Analyzing Historical Complaints
+The project is currently in the initial setup and profiling stage. The raw dataset has been cataloged and profiled, but data cleaning, models, and dashboards have not yet been built.
 
-Analyzing historical complaints helps organizations uncover patterns in customer dissatisfaction, understand drivers behind disputes, and evaluate company responses. By systematically examining complaints, risk managers and operations teams can prioritize recurring pain points, measure resolution effectiveness, and make informed, data-driven decisions to improve customer trust.
+## Dataset
 
-## Dataset and Sources
+The project uses a historical extract from the CFPB Consumer Complaint Database covering January 2019 through early January 2020. Every record in this extract contains a customer-written complaint narrative submitted online with publication consent.
 
-This project uses a historical extract from the Consumer Financial Protection Bureau (CFPB) Consumer Complaint Database.
+- **Source agency:** [Consumer Financial Protection Bureau (CFPB)](https://www.consumerfinance.gov/data-research/consumer-complaints/)
+- **Historical distribution:** Distributed by Emil Hvitfeldt and Julia Silge for [*Supervised Machine Learning for Text Analysis in R*](https://github.com/EmilHvitfeldt/smltar).
+- **Direct download:** [complaints.csv.gz](https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz)
 
-- Original agency source: [Consumer Financial Protection Bureau (CFPB)](https://www.consumerfinance.gov/data-research/consumer-complaints/)
-- Pinned historical distribution: Distributed by Emil Hvitfeldt and Julia Silge for [*Supervised Machine Learning for Text Analysis in R* (SMLTAR)](https://github.com/EmilHvitfeldt/smltar).
-- Download URL: [complaints.csv.gz](https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz)
-- Expected SHA-256: `f4a5e174d364f1e1a25fac324e1a8224ff4e9454326e6e58abaa194bca93097b`
+## Tools and Technologies
 
-The dataset contains structured complaint records, company responses, consumer disputed flags, and narrative descriptions submitted by consumers.
+- **Python 3.11:** Core programming language.
+- **pandas:** Data manipulation and summary calculations.
+- **PyYAML:** Configuration file loading.
+- **pytest:** Unit testing framework.
 
-## Planned Analytical Workflow
+Later stages will add tools for relational storage (SQLite), text processing, classical machine learning, and an interactive dashboard (Streamlit).
 
-The planned end-to-end analytics workflow will encompass:
+## Project Workflow
 
-1. **Data Ingestion and Integrity:** Verifying raw file integrity and loading structured data into clean tabular formats.
-2. **Relational Modeling (SQL):** Storing and querying structured complaint records using SQLite for repeatable aggregation and reporting.
-3. **Exploratory Data Analysis:** Evaluating complaint distributions across financial products, submission channels, and companies.
-4. **Natural Language Processing (NLP):** Processing free-form complaint narratives through tokenization, n-gram analysis, and keyword extraction.
-5. **Machine Learning:** Training and evaluating classical machine-learning models to explore complaint outcomes and classification patterns.
-6. **Decision-Support Dashboard:** Presenting summary metrics and exploratory findings in an interactive Streamlit interface.
+The planned project workflow includes:
 
-## Current Project Status
+1. **Dataset profiling:** Inspecting schema, missing values, record integrity, and category distributions.
+2. **Data preparation:** Cleaning fields, standardizing categories, and resolving duplicate text.
+3. **Relational storage:** Organizing structured complaint records in SQLite for SQL analysis.
+4. **Natural language processing:** Extracting key themes and terms from customer complaint narratives.
+5. **Outcome analysis and modeling:** Evaluating factors associated with company relief responses using classical machine learning.
+6. **Interactive dashboard:** Presenting findings through an exploratory Streamlit application.
 
-The initial project foundation and raw dataset profiling have been completed. The raw dataset integrity has been verified, all 18 fields are documented in the data dictionary, and an initial dataset profile report has been generated. No data cleaning pipelines, feature engineering, database tables, analytical models, or dashboards have been built yet.
-
-## Data Profiling
-
-To verify the raw dataset integrity and generate the technical profiling report, run:
-
-```bash
-python src/data/profile_complaints.py
-```
-
-Detailed documentation and generated profiling outputs:
-- [Data Dictionary](docs/data_dictionary.md): Field definitions, data types, missing rates, and planned project roles.
-- [Data Profiling Report](reports/data_profile.md): Detailed structural metrics, narrative coverage, category distributions, and data-quality findings.
-
-## Data Limitations
-
-When working with historical CFPB complaint data, several limitations apply:
-
-- **Self-Selection Bias:** Complaints reflect consumers who encountered friction severe enough to file a federal complaint, not the entire customer population.
-- **Narrative Availability:** Consumer narrative opt-ins were not present across all reporting periods, so text narratives represent a subset of overall records.
-- **Company Context:** Complaint volume is strongly correlated with company size and customer base volume rather than complaint rate per transaction.
-- **Historical Snapshot:** Pinned historical extracts reflect a specific capture window and do not represent live operational records.
-
-## Environment Setup and Installation
+## Getting Started
 
 ### Prerequisites
 
 - Python 3.11
 - Git
 
-### Setup Steps
+### Installation
 
-1. Clone the repository and navigate into the project directory:
+1. Clone the repository and move into the project directory:
 
    ```bash
    git clone https://github.com/nayanojwal0810/SUNWAI.git
    cd SUNWAI
    ```
 
-2. Create and activate a Python 3.11 virtual environment:
+2. Create and activate a virtual environment:
+
+   ```powershell
+   # Windows PowerShell:
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
 
    ```bash
-   python -m venv .venv
-   # On Windows (PowerShell):
-   .venv\Scripts\Activate.ps1
-   # On macOS/Linux:
+   # macOS / Linux:
+   python3 -m venv .venv
    source .venv/bin/activate
    ```
 
-3. Install the initial project dependencies:
+3. Install project dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Place the raw dataset at `data/raw/complaints.csv.gz`:
+4. Place the raw dataset in `data/raw/`:
 
-   ```bash
-   mkdir -p data/raw
-   # Download the pinned historical dataset file:
-   curl -Lo data/raw/complaints.csv.gz https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz
+   ```powershell
+   # Windows PowerShell:
+   New-Item -ItemType Directory -Force -Path data/raw
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/EmilHvitfeldt/smltar/3ae4ab3e7ce53e3d74dded5f17e7cf8dbe164caa/data/complaints.csv.gz" -OutFile "data/raw/complaints.csv.gz"
    ```
 
-5. Confirm the SHA-256 checksum matches `f4a5e174d364f1e1a25fac324e1a8224ff4e9454326e6e58abaa194bca93097b`.
+5. Run dataset profiling and tests:
 
+   ```bash
+   python src/data/profile_complaints.py
+   python -m pytest -q
+   ```
+
+## Project Files
+
+- `src/data/profile_complaints.py`: Script that inspects the raw dataset and calculates summary statistics.
+- `docs/data_dictionary.md`: [Data Dictionary](docs/data_dictionary.md) explaining all 18 dataset columns.
+- `reports/data_profile.md`: [Data Profile Report](reports/data_profile.md) detailing dataset quality and distributions.
+- `tests/test_profile_complaints.py`: Unit tests for profiling and verification functions.
+- `config/settings.yaml`: Project paths and configuration settings.
+- `requirements.txt`: Initial Python dependencies.
+
+## Data Limitations
+
+- **Selection bias:** The dataset contains only complaints where consumers chose to submit a written narrative online and consented to publish it.
+- **Missing dispute information:** The `consumer_disputed` field is completely empty because the CFPB stopped collecting this information in early 2017.
+- **Duplicate narratives:** Several thousand records share identical complaint text, likely from form letters or batch submissions.
+- **Reporting window:** The data ends on January 9, 2020. January 2020 contains only a partial month of data.
+- **Self-reported outcomes:** Company responses reflect what companies reported to the CFPB, not verified consumer satisfaction.
